@@ -1,0 +1,55 @@
+{
+  "success": true,
+  "status": "complete",
+  "time": "2026-11-11T19:13:38.244569959Z",
+  "elapsedMillis": 16356,
+  "stage": "DONE",
+  "checks": [
+    {
+      "detail": "Nonempty reserved head square without an avatar",
+      "passed": true,
+      "name": "native-skin-fallback"
+    },
+    {
+      "detail": "Saw distinct red and blue live frames within the head bounds",
+      "passed": true,
+      "name": "before-line-full"
+    },
+    {
+      "detail": "Saw distinct red and blue live frames within the head bounds",
+      "passed": true,
+      "name": "before-name-full"
+    },
+    {
+      "detail": "Saw distinct red and blue live frames within the head bounds",
+      "passed": true,
+      "name": "before-line-half"
+    },
+    {
+      "detail": "Saw distinct red and blue live frames within the head bounds",
+      "passed": true,
+      "name": "before-name-half"
+    },
+    {
+      "detail": "BEFORE_NAME face is to the right of BEFORE_LINE face",
+      "passed": true,
+      "name": "rank-prefix-placement"
+    },
+    {
+      "detail": "Measured brightness ratio 0.2836155378486056",
+      "passed": true,
+      "name": "native-chat-fade"
+    },
+    {
+      "detail": "Measured brightness ratio 0.04594123505976096",
+      "passed": true,
+      "name": "native-chat-near-zero-fade"
+    },
+    {
+      "detail": "Native skin remains visible",
+      "passed": true,
+      "name": "portraits-disabled-fallback"
+    }
+  ],
+  "scope": "Actual ChatComponent and OpenGL rendering in a disposable local world; original native-loaded Figura fixture; no multiplayer transport, avatar upload, third-party avatar compatibility, or HEAD-fallback fixture is claimed."
+}

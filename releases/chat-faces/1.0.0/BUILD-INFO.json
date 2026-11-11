@@ -1,0 +1,25 @@
+{
+  "name": "Chat Faces",
+  "version": "1.0.0",
+  "tested_source_commit": "f8af5bb328fe18c7affc8fcfd452842fd9dd68db",
+  "workflow_run_url": "https://github.com/WeepingAngeIs/Jars/actions/runs/43084854529",
+  "workflow_run_id": 43084854529,
+  "release_artifact_id": 13885937948,
+  "evidence_artifact_id": 13885478645,
+  "minecraft": "1.21.1",
+  "neoforge_tested": "21.1.249",
+  "neoforge_declared_range": "[21.1.22,21.2)",
+  "java_major": 21,
+  "chat_heads": "0.15.7",
+  "figura": "0.1.6+1.21.1",
+  "binary_contract_tests": {
+    "passed": 5,
+    "failed": 0
+  },
+  "real_client_checks": {
+    "passed": 9,
+    "failed": 0
+  },
+  "distribution": "Exact files downloaded from the successful GitHub Actions artifact; no release rebuild or repackaging.",
+  "validation_scope": "Actual Minecraft ChatComponent and OpenGL rendering in a disposable local world with an original Figura avatar loaded through the native local loader. No multiplayer transport, avatar upload, supplied Miku avatar runtime validation, or separate HEAD-fallback fixture is claimed."
+}
