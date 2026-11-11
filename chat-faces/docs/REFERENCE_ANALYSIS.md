@@ -1,5 +1,9 @@
 # Reference analysis
 
+This document records the historical 1.0.0 integration research. Version 1.1.0
+has its own chat layout and sender detection; Chat Heads is no longer used or
+required. See the current README and CI workflow for the standalone version.
+
 ## Scope and evidence
 
 Chat Faces targets Minecraft 1.21.1 on NeoForge, with Java 21. It is a client

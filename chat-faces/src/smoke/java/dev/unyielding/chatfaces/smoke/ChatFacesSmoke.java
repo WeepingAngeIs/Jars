@@ -14,6 +14,8 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ChatType;
+import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -61,10 +63,11 @@ public final class ChatFacesSmoke {
 
     private static final long TIMEOUT_MILLIS = 230_000L;
     private static final List<Case> CASES = List.of(
-            new Case("before-line-full", false, 1.0),
-            new Case("before-name-full", true, 1.0),
-            new Case("before-line-half", false, 0.5),
-            new Case("before-name-half", true, 0.5));
+            new Case("before-line-full", false, 1.0, false),
+            new Case("before-name-full", true, 1.0, false),
+            new Case("before-line-half", false, 0.5, false),
+            new Case("before-name-half", true, 0.5, false),
+            new Case("received-player-message", false, 1.0, true));
 
     private final AtomicBoolean finished = new AtomicBoolean();
     private final List<Map<String, Object>> checks = new ArrayList<>();
@@ -211,13 +214,20 @@ public final class ChatFacesSmoke {
     private void prepareChat(Case spec) {
         Minecraft mc = Minecraft.getInstance();
         mc.options.chatScale().set(spec.scale);
-        chat = new ChatComponent(mc);
+        chat = spec.listener ? mc.gui.getChat() : new ChatComponent(mc);
+        if (spec.listener) chat.clearMessages(false);
         createdAt = mc.gui.getGuiTicks();
         Component message = Component.literal((spec.ranked ? "[Rank] " : "") + owner.getProfile().getName()
                 + ": original animated fixture");
-        var previous = ChatMessageLayout.setSender(owner.getProfile());
-        try { chat.addMessage(message, null, null); }
-        finally { ChatMessageLayout.setSender(previous); }
+        if (spec.listener) {
+            mc.getChatListener().handlePlayerChatMessage(
+                    PlayerChatMessage.unsigned(owner.getProfile().getId(), "original animated fixture"),
+                    owner.getProfile(), ChatType.bind(ChatType.CHAT, mc.player));
+        } else {
+            var previous = ChatMessageLayout.setSender(owner.getProfile());
+            try { chat.addMessage(message, null, null); }
+            finally { ChatMessageLayout.setSender(previous); }
+        }
     }
 
     private void prepareAnimatedCase() {
@@ -558,6 +568,6 @@ public final class ChatFacesSmoke {
         return sum;
     }
 
-    private record Case(String name, boolean ranked, double scale) { }
+    private record Case(String name, boolean ranked, double scale, boolean listener) { }
     private record Marker(int count, int red, int blue, int minX, int minY, int maxX, int maxY) { }
 }

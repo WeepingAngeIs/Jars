@@ -1,5 +1,16 @@
 # Validation plan and results
 
+## Standalone 1.1.0
+
+The current CI workflow runs the client without Chat Heads. It exercises Figura
+animation, skin fallback, chat scale and fading, received messages, and death
+messages with multiple entity types, including a custom-named entity. Consult
+the workflow run and its evidence artifact for the result of a particular
+commit. These are disposable singleplayer client checks; multiplayer transport
+and the complete user modpack are not covered.
+
+The remainder of this file records the historical 1.0.0 addon validation.
+
 ## Status
 
 **Chat Faces 1.0.0 passed five binary-contract tests and nine real-client
