@@ -2,6 +2,7 @@ package dev.unyielding.chatfaces.smoke;
 
 import com.google.gson.GsonBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
 import dev.unyielding.chatfaces.client.ChatMessageLayout;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.GuiMessage;
@@ -364,8 +365,12 @@ public final class ChatFacesSmoke {
 
     private NativeImage drawAndCapture(GuiGraphics graphics, int time, boolean focused) {
         graphics.flush();
+        // Isolate the capture from the HUD that Minecraft already rendered and
+        // from earlier samples made in this same GUI frame.
+        RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
         graphics.fill(0, 0, graphics.guiWidth(), graphics.guiHeight(), 0xFF000000);
         graphics.flush();
+        RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
         int framebuffer = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING);
         int[] viewport = new int[4];
         GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
