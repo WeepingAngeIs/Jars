@@ -2,6 +2,10 @@
 
 Live Figura faces in Minecraft chat for **Minecraft 1.21.1 / NeoForge / Java 21**.
 
+Requires NeoForge **21.1.22 or newer in the 21.1 series**; builds and client
+checks use **21.1.249**. Earlier releases bundle an older MixinExtras version
+without the method wrapper used by this addon.
+
 Chat Faces is a client-side addon for **Chat Heads** and **Figura**. It draws the
 player's current Figura portrait in the space Chat Heads already reserves for a
 skin head. It follows Figura's Tab-list portrait selection, including a custom

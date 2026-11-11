@@ -1,5 +1,5 @@
 CHAT FACES 1.0.0
-Minecraft 1.21.1 | NeoForge | Java 21
+Minecraft 1.21.1 | NeoForge 21.1.22+ (21.1 series) | Java 21
 
 INSTALL ON THE CLIENT
 

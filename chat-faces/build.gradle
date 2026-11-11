@@ -42,7 +42,6 @@ neoForge {
             client()
             loadedMods = [mods.chatfaces]
             systemProperty 'mixin.debug.export', 'true'
-            systemProperty 'mixin.debug.countInjections', 'true'
         }
         clientSmoke {
             client()
@@ -51,7 +50,6 @@ neoForge {
             gameDirectory = file('run-smoke')
             programArguments.addAll '--username', 'ChatFacesTest', '--width', '1280', '--height', '720'
             systemProperty 'chatfaces.smoke', 'true'
-            systemProperty 'mixin.debug.countInjections', 'true'
         }
     }
 }

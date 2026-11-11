@@ -19,7 +19,7 @@ config="chatfaces.mixins.json"
 [[dependencies.chatfaces]]
 modId="neoforge"
 type="required"
-versionRange="[21.1.0,21.2)"
+versionRange="[21.1.22,21.2)"
 ordering="NONE"
 side="CLIENT"
 
