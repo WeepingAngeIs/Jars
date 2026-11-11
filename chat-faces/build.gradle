@@ -87,7 +87,7 @@ tasks.named('test', Test).configure {
     useJUnitPlatform()
     // These tests inspect class files; a NeoForge/Minecraft game bootstrap is
     // unnecessary. ModDev keeps its game JAR off ordinary JUnit classpaths.
-    def gameJar = layout.buildDirectory.file("moddev/artifacts/neoforge-${neo_version}-merged.jar")
+    def gameJar = layout.buildDirectory.file("moddev/artifacts/neoforge-${neo_version}.jar")
     inputs.file(gameJar)
     systemProperty 'chatfaces.test.minecraftJar', gameJar.get().asFile.absolutePath
 }
