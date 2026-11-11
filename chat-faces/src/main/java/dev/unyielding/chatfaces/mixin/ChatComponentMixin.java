@@ -23,6 +23,16 @@ import java.util.List;
 /** The wrapper also cleans up when another chat renderer throws an exception. */
 @Mixin(ChatComponent.class)
 public abstract class ChatComponentMixin {
+    @WrapMethod(method = "addMessage(Lnet/minecraft/network/chat/Component;)V")
+    private void chatfaces$captureSystemLine(Component message, Operation<Void> original) {
+        Object previous = ChatMessageLayout.captureDeath(message);
+        try {
+            original.call(message);
+        } finally {
+            ChatMessageLayout.restoreDeath(previous);
+        }
+    }
+
     @WrapMethod(method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V")
     private void chatfaces$captureOriginal(Component message, MessageSignature signature,
                                            GuiMessageTag tag, Operation<Void> original) {

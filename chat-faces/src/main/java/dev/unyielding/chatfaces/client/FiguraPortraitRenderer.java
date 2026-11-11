@@ -274,7 +274,8 @@ public final class FiguraPortraitRenderer {
                     living.yBodyRot = living.yBodyRotO = 180;
                     living.yHeadRot = living.yHeadRotO = 180;
                 }
-                float scale = Math.min(12.0f, Math.max(3.0f, 7.0f / Math.max(0.5f, entity.getBbWidth())));
+                float faceExtent = Math.max(0.6f, Math.min(entity.getBbWidth(), entity.getBbHeight()));
+                float scale = Math.min(12.0f, Math.max(3.0f, 8.0f / faceExtent));
                 float focus = living == null ? entity.getBbHeight() * 0.65f : living.getEyeHeight();
                 offscreen.pose().pushPose();
                 offscreen.pose().translate(4.0, 4.0, 50.0);

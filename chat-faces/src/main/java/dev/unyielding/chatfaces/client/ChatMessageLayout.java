@@ -76,12 +76,9 @@ public final class ChatMessageLayout {
             BiFunction<FormattedText, Integer, List<FormattedCharSequence>> original) {
         Selection selection = MESSAGES.computeIfAbsent(message, ignored -> {
             Selection captured = ORIGINAL_DEATH.get();
-            Selection resolved = captured == null ? null : realign(captured, message.content().getString());
+            Selection resolved = captured == null ? null : realign(captured, message.content());
             return resolved != null ? resolved : identify(message.content(), SENDER.get());
         });
-        if (Boolean.getBoolean("chatfaces.smoke") && message.content().getString().contains("was slain by")) {
-            System.out.println("CHAT_FACES_WRAP_DEBUG content=" + message.content() + " selection=" + selection);
-        }
         if (selection.inserts().isEmpty()) return original.apply(message.content(), width);
 
         Component decorated = addMarkers(message.content(), selection);
@@ -104,9 +101,6 @@ public final class ChatMessageLayout {
                 return true;
             });
             if (!placements.isEmpty()) LINES.put(line, List.copyOf(placements));
-            if (Boolean.getBoolean("chatfaces.smoke") && message.content().getString().contains("was slain by")) {
-                System.out.println("CHAT_FACES_WRAP_DEBUG placements=" + placements + " line=" + line);
-            }
         }
         return lines;
     }
@@ -151,12 +145,14 @@ public final class ChatMessageLayout {
     }
 
     @Nullable
-    private static Selection realign(Selection original, String text) {
+    private static Selection realign(Selection original, Component displayed) {
+        String text = displayed.getString();
         List<Insertion> placed = new ArrayList<>();
         int from = 0;
         for (Insertion insert : original.inserts()) {
             String name = insert.name();
             int position = indexOfIgnoreCase(text, name, from);
+            if (position < 0) position = findStyledEntity(displayed, insert.portrait().id(), from);
             if (position < 0 && insert.portrait().player() != null) {
                 name = insert.portrait().player().getProfile().getName();
                 position = indexOfIgnoreCase(text, name, from);
@@ -166,6 +162,23 @@ public final class ChatMessageLayout {
             from = position + name.length();
         }
         return placed.isEmpty() ? null : new Selection(List.copyOf(placed));
+    }
+
+    private static int findStyledEntity(Component displayed, @Nullable UUID id, int from) {
+        if (id == null) return -1;
+        int[] cursor = {0};
+        int[] result = {-1};
+        displayed.visit((style, text) -> {
+            int start = cursor[0];
+            cursor[0] += text.length();
+            HoverEvent hover = style.getHoverEvent();
+            HoverEvent.EntityTooltipInfo info = hover == null ? null : hover.getValue(HoverEvent.Action.SHOW_ENTITY);
+            if (result[0] < 0 && cursor[0] > from && info != null && id.equals(info.id)) {
+                result[0] = Math.max(start, from);
+            }
+            return Optional.empty();
+        }, Style.EMPTY);
+        return result[0];
     }
 
     @Nullable

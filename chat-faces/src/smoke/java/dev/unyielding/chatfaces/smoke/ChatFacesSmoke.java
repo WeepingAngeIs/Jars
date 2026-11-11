@@ -85,7 +85,8 @@ public final class ChatFacesSmoke {
     private int beforeNameX = -1;
     private int deathCase;
     private List<ChatMessageLayout.PlacedPortrait> deathPlacements;
-    private final List<EntityType<?>> deathTypes = List.of(EntityType.ZOMBIE, EntityType.SKELETON, EntityType.SPIDER);
+    private final List<EntityType<?>> deathTypes = List.of(
+            EntityType.ZOMBIE, EntityType.SKELETON, EntityType.SPIDER, EntityType.ZOMBIE, EntityType.PLAYER);
 
     public ChatFacesSmoke() {
         if (!Boolean.getBoolean("chatfaces.smoke")) {
@@ -499,32 +500,29 @@ public final class ChatFacesSmoke {
     private void prepareDeath() {
         Minecraft mc = Minecraft.getInstance();
         mc.options.chatScale().set(1.0);
-        chat = new ChatComponent(mc);
+        chat = deathCase == 1 ? mc.gui.getChat() : new ChatComponent(mc);
+        if (deathCase == 1) chat.clearMessages(false);
         createdAt = mc.gui.getGuiTicks();
-        Entity mob = deathTypes.get(deathCase).create(mc.level);
+        Entity mob = deathTypes.get(deathCase) == EntityType.PLAYER ? mc.player : deathTypes.get(deathCase).create(mc.level);
         require(mob != null, "Could not create test creature");
+        if (deathCase == 3) mob.setCustomName(Component.literal("Smudge"));
         Component victim = mc.player.getDisplayName();
         Component attacker = mob.getDisplayName();
         Component message = Component.translatable("death.attack.mob", victim, attacker);
-        System.out.println("CHAT_FACES_DEATH_DEBUG victim=" + victim + " attacker=" + attacker
-                + " root=" + message.getContents());
-        try {
-            var identify = ChatMessageLayout.class.getDeclaredMethod("identify", Component.class, com.mojang.authlib.GameProfile.class);
-            identify.setAccessible(true);
-            System.out.println("CHAT_FACES_DEATH_DEBUG selection=" + identify.invoke(null, message, null));
-        } catch (ReflectiveOperationException error) {
-            throw new IllegalStateException(error);
-        }
-        chat.addMessage(message);
+        if (deathCase == 1) mc.getChatListener().handleSystemMessage(message, false);
+        else chat.addMessage(message);
         try {
             var field = ChatComponent.class.getDeclaredField("trimmedMessages");
             field.setAccessible(true);
             @SuppressWarnings("unchecked") List<GuiMessage.Line> lines = (List<GuiMessage.Line>) field.get(chat);
             deathPlacements = lines.stream().flatMap(line -> ChatMessageLayout.portraits(line.content()).stream()).toList();
-            System.out.println("CHAT_FACES_DEATH_DEBUG placements=" + deathPlacements);
             require(deathPlacements.size() == 2, "Expected both victim and attacker markers in a death message");
             require(deathPlacements.stream().anyMatch(p -> p.portrait().player() != null), "Victim identity missing");
-            require(deathPlacements.stream().anyMatch(p -> p.portrait().type() == deathTypes.get(deathCase)), "Attacker identity missing");
+            if (deathTypes.get(deathCase) == EntityType.PLAYER) {
+                require(deathPlacements.stream().filter(p -> p.portrait().player() != null).count() == 2, "Player attacker identity missing");
+            } else {
+                require(deathPlacements.stream().anyMatch(p -> p.portrait().type() == deathTypes.get(deathCase)), "Attacker identity missing");
+            }
         } catch (ReflectiveOperationException error) {
             throw new IllegalStateException(error);
         }
@@ -533,10 +531,12 @@ public final class ChatFacesSmoke {
     private void verifyDeath(GuiGraphics graphics) throws Exception {
         Minecraft mc = Minecraft.getInstance();
         try (NativeImage image = drawAndCapture(graphics, createdAt, true)) {
-            int x = 4 + deathPlacements.stream().filter(p -> p.portrait().type() == deathTypes.get(deathCase))
-                    .findFirst().orElseThrow().x();
+            int x = 4 + deathPlacements.getLast().x();
             require(iconEnergyAt(image, graphics, x) > 60,
                     "No creature portrait in death message for " + deathTypes.get(deathCase));
+            int victimX = 4 + deathPlacements.stream().filter(p -> p.portrait().player() != null)
+                    .findFirst().orElseThrow().x();
+            require(iconEnergyAt(image, graphics, victimX) > 60, "No victim portrait in death message");
             save(image, "smoke-death-" + deathCase + ".png");
             pass("death-portrait-" + deathCase, "Victim and creature appear in the vanilla death message");
         }
