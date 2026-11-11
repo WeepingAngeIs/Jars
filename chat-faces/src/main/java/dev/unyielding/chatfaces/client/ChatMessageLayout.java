@@ -34,6 +34,7 @@ public final class ChatMessageLayout {
     private static final Map<GuiMessage, Selection> MESSAGES = new WeakHashMap<>();
     private static final Map<FormattedCharSequence, List<PlacedPortrait>> LINES = new WeakHashMap<>();
     private static final ThreadLocal<GameProfile> SENDER = new ThreadLocal<>();
+    private static final ThreadLocal<Selection> ORIGINAL_DEATH = new ThreadLocal<>();
 
     private ChatMessageLayout() {}
 
@@ -42,6 +43,18 @@ public final class ChatMessageLayout {
         GameProfile old = SENDER.get();
         if (profile == null) SENDER.remove(); else SENDER.set(profile);
         return old;
+    }
+
+    /** Preserve vanilla death metadata before another client mod decorates text. */
+    @Nullable
+    public static Object captureDeath(Component message) {
+        Selection previous = ORIGINAL_DEATH.get();
+        if (findDeath(message, 0) != null) ORIGINAL_DEATH.set(identify(message, null));
+        return previous;
+    }
+
+    public static void restoreDeath(@Nullable Object previous) {
+        if (previous == null) ORIGINAL_DEATH.remove(); else ORIGINAL_DEATH.set((Selection) previous);
     }
 
     public record Portrait(@Nullable PlayerInfo player, @Nullable EntityType<?> type,
@@ -55,14 +68,17 @@ public final class ChatMessageLayout {
     }
 
     public record PlacedPortrait(int x, Portrait portrait) {}
-    private record Insertion(int index, Portrait portrait) {}
+    private record Insertion(int index, Portrait portrait, String name) {}
     private record Selection(List<Insertion> inserts) {}
     private record Segment(Style style, String text) {}
 
     public static List<FormattedCharSequence> wrap(GuiMessage message, int width, Font font,
             BiFunction<FormattedText, Integer, List<FormattedCharSequence>> original) {
-        Selection selection = MESSAGES.computeIfAbsent(message,
-                ignored -> identify(message.content(), SENDER.get()));
+        Selection selection = MESSAGES.computeIfAbsent(message, ignored -> {
+            Selection captured = ORIGINAL_DEATH.get();
+            Selection resolved = captured == null ? null : realign(captured, message.content().getString());
+            return resolved != null ? resolved : identify(message.content(), SENDER.get());
+        });
         if (Boolean.getBoolean("chatfaces.smoke") && message.content().getString().contains("was slain by")) {
             System.out.println("CHAT_FACES_WRAP_DEBUG content=" + message.content() + " selection=" + selection);
         }
@@ -103,6 +119,7 @@ public final class ChatMessageLayout {
         MESSAGES.clear();
         LINES.clear();
         SENDER.remove();
+        ORIGINAL_DEATH.remove();
     }
 
     private static Selection identify(Component message, @Nullable GameProfile signedSender) {
@@ -119,7 +136,7 @@ public final class ChatMessageLayout {
                 if (portrait == null) continue;
                 int position = indexOfIgnoreCase(text, name.getString(), searchFrom);
                 if (position < 0) position = i == 0 ? 0 : text.length();
-                found.add(new Insertion(position, portrait));
+                found.add(new Insertion(position, portrait, name.getString()));
                 searchFrom = Math.min(text.length(), position + name.getString().length());
             }
             found.sort(Comparator.comparingInt(Insertion::index));
@@ -130,7 +147,25 @@ public final class ChatMessageLayout {
         if (player == null) return new Selection(List.of());
         int position = indexOfIgnoreCase(text, player.getProfile().getName(), 0);
         if (position < 0 || position > 160) position = 0;
-        return new Selection(List.of(new Insertion(position, Portrait.player(player))));
+        return new Selection(List.of(new Insertion(position, Portrait.player(player), player.getProfile().getName())));
+    }
+
+    @Nullable
+    private static Selection realign(Selection original, String text) {
+        List<Insertion> placed = new ArrayList<>();
+        int from = 0;
+        for (Insertion insert : original.inserts()) {
+            String name = insert.name();
+            int position = indexOfIgnoreCase(text, name, from);
+            if (position < 0 && insert.portrait().player() != null) {
+                name = insert.portrait().player().getProfile().getName();
+                position = indexOfIgnoreCase(text, name, from);
+            }
+            if (position < 0) return null;
+            placed.add(new Insertion(position, insert.portrait(), name));
+            from = position + name.length();
+        }
+        return placed.isEmpty() ? null : new Selection(List.copyOf(placed));
     }
 
     @Nullable

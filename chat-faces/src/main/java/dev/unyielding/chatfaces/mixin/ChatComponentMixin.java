@@ -11,6 +11,9 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MessageSignature;
+import net.minecraft.client.GuiMessageTag;
 import net.minecraft.util.FormattedCharSequence;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,6 +23,17 @@ import java.util.List;
 /** The wrapper also cleans up when another chat renderer throws an exception. */
 @Mixin(ChatComponent.class)
 public abstract class ChatComponentMixin {
+    @WrapMethod(method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V")
+    private void chatfaces$captureOriginal(Component message, MessageSignature signature,
+                                           GuiMessageTag tag, Operation<Void> original) {
+        Object previous = ChatMessageLayout.captureDeath(message);
+        try {
+            original.call(message, signature, tag);
+        } finally {
+            ChatMessageLayout.restoreDeath(previous);
+        }
+    }
+
     @WrapMethod(method = "render(Lnet/minecraft/client/gui/GuiGraphics;IIIZ)V")
     private void chatfaces$renderChatWithFaces(GuiGraphics graphics, int tickCount,
                                              int mouseX, int mouseY, boolean focused,

@@ -15,6 +15,16 @@ import java.time.Instant;
 /** Retains the authenticated sender while Minecraft adds a received message. */
 @Mixin(ChatListener.class)
 public abstract class ChatListenerMixin {
+    @WrapMethod(method = "handleSystemMessage")
+    private void chatfaces$captureSystem(Component message, boolean overlay, Operation<Void> original) {
+        Object previous = ChatMessageLayout.captureDeath(message);
+        try {
+            original.call(message, overlay);
+        } finally {
+            ChatMessageLayout.restoreDeath(previous);
+        }
+    }
+
     @WrapMethod(method = "showMessageToPlayer")
     private boolean chatfaces$sender(ChatType.Bound type, PlayerChatMessage message,
                                     Component decorated, GameProfile profile, boolean secure,
