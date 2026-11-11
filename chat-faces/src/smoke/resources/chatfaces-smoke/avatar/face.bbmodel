@@ -1,0 +1,144 @@
+{
+  "meta": {
+    "format_version": "4.10",
+    "model_format": "figura",
+    "box_uv": false
+  },
+  "name": "face",
+  "resolution": {
+    "width": 16,
+    "height": 16
+  },
+  "elements": [
+    {
+      "name": "OriginalCube",
+      "type": "cube",
+      "uuid": "2c0ad261-7cd0-48de-9ccc-7681ff28b847",
+      "from": [
+        -4,
+        0,
+        -4
+      ],
+      "to": [
+        4,
+        8,
+        4
+      ],
+      "origin": [
+        0,
+        4,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "inflate": 0,
+      "shade": false,
+      "export": true,
+      "visibility": true,
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": 0
+        }
+      }
+    }
+  ],
+  "outliner": [
+    {
+      "name": "Portrait",
+      "uuid": "a067327e-b410-43ca-ae35-1ce302f304ec",
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "export": true,
+      "visibility": true,
+      "children": [
+        {
+          "name": "Pulse",
+          "uuid": "49d3aa42-1c34-437b-b43b-69f82b793d00",
+          "origin": [
+            0,
+            4,
+            0
+          ],
+          "export": true,
+          "visibility": true,
+          "children": [
+            "2c0ad261-7cd0-48de-9ccc-7681ff28b847"
+          ]
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "name": "white.png",
+      "uuid": "a33fa2da-2daf-4b48-b902-1e8196eb6e02",
+      "id": "0",
+      "width": 16,
+      "height": 16,
+      "uv_width": 16,
+      "uv_height": 16,
+      "relative_path": "white.png",
+      "mode": "bitmap",
+      "internal": true,
+      "source": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAFklEQVR4nGP4TyFgGDVg1IBRA4aLAQBdePwur/3haQAAAABJRU5ErkJggg=="
+    }
+  ],
+  "animations": []
+}

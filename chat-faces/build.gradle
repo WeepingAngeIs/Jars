@@ -1,0 +1,114 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+group = 'dev.unyielding.chatfaces'
+version = mod_version
+base { archivesName = 'Chat-Faces' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.withSourcesJar()
+
+// A separate development-only mod exercises real rendering in disposable CI.
+// Its classes and original test avatar assets are excluded from release JARs.
+sourceSets {
+    smoke {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    smokeImplementation.extendsFrom implementation
+    smokeRuntimeOnly.extendsFrom runtimeOnly
+}
+
+repositories {
+    mavenCentral()
+    exclusiveContent {
+        forRepository { maven { url = 'https://api.modrinth.com/maven' } }
+        filter { includeGroup 'maven.modrinth' }
+    }
+}
+
+neoForge {
+    version = neo_version
+    addModdingDependenciesTo sourceSets.smoke
+    mods {
+        chatfaces { sourceSet sourceSets.main }
+        chatfaces_smoke { sourceSet sourceSets.smoke }
+    }
+    runs {
+        client {
+            client()
+            loadedMods = [mods.chatfaces]
+            systemProperty 'mixin.debug.export', 'true'
+            systemProperty 'mixin.debug.countInjections', 'true'
+        }
+        clientSmoke {
+            client()
+            sourceSet = sourceSets.smoke
+            loadedMods = [mods.chatfaces, mods.chatfaces_smoke]
+            gameDirectory = file('run-smoke')
+            programArguments.addAll '--username', 'ChatFacesTest', '--width', '1280', '--height', '720'
+            systemProperty 'chatfaces.smoke', 'true'
+            systemProperty 'mixin.debug.countInjections', 'true'
+        }
+    }
+}
+
+dependencies {
+    // Exact public artifacts matched by SHA-512 to the inspected reference JARs.
+    implementation 'maven.modrinth:chat-heads:ZPylso9i'
+    implementation 'maven.modrinth:figura:AvgeQoZm'
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.ow2.asm:asm-tree:9.7.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    inputs.property 'version', project.version
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand version: project.version
+    }
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    // These tests inspect class files; a NeoForge/Minecraft game bootstrap is
+    // unnecessary. ModDev keeps its game JAR off ordinary JUnit classpaths.
+    def gameJar = layout.buildDirectory.file("moddev/artifacts/neoforge-${neo_version}-merged.jar")
+    inputs.file(gameJar)
+    systemProperty 'chatfaces.test.minecraftJar', gameJar.get().asFile.absolutePath
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes 'Implementation-Title': 'Chat Faces',
+                   'Implementation-Version': project.version,
+                   'Implementation-Vendor': 'Unyielding'
+    }
+    from('LICENSE')
+}
+
+tasks.register('releaseZip', Zip) {
+    dependsOn tasks.named('jar')
+    archiveFileName = "Chat-Faces-${project.version}-NeoForge-1.21.1.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from(tasks.named('jar'))
+    from('INSTALL.txt', 'README.md', 'LICENSE')
+}
+
+tasks.named('build').configure {
+    dependsOn tasks.named('releaseZip')
+}

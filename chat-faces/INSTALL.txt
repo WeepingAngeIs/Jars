@@ -1,0 +1,33 @@
+CHAT FACES 1.0.0
+Minecraft 1.21.1 | NeoForge | Java 21
+
+INSTALL ON THE CLIENT
+
+1. Close Minecraft.
+2. Open your Minecraft instance's mods folder.
+3. Keep these dependency mods installed:
+   - chat_heads-0.15.7-neoforge-1.21.jar
+   - figura-0.1.6+1.21.1-neoforge-mc.jar
+4. Add Chat-Faces-1.0.0.jar to that same mods folder.
+5. Restart Minecraft.
+
+Install the JAR, not this ZIP or the sources JAR.
+Every player who wants to see Figura faces installs it on their own client.
+No server-side installation or Unyielding change is required.
+
+WHAT TO EXPECT
+
+Chat Faces uses the same live Figura portrait as Tab. Chat Heads still handles
+the speaker, rank/name placement, wrapping, scrolling, and ordinary skin heads.
+Figura still handles avatar loading and trust. Enable Figura's avatar portrait
+setting and use Chat Heads' Before Name or Before Line setting as desired.
+
+An avatar may have a separate, static Tab portrait even if its full model blinks.
+Chat Faces follows that authored portrait. The mod does not add animation to an
+avatar that has not defined it.
+
+If no usable Figura face is available, the normal skin head remains.
+Configuration preview and command-suggestion icons use normal skin heads.
+
+Source and validation notes:
+https://github.com/WeepingAngeIs/Jars/tree/codex/chat-faces-figura/chat-faces

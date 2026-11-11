@@ -1,0 +1,30 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="chatfaces_smoke"
+version="0.0.0-test"
+displayName="Chat Faces Development Smoke Test"
+description="Development-only disposable-world rendering checks. Not included in the release JAR."
+
+[[dependencies.chatfaces_smoke]]
+modId="chatfaces"
+type="required"
+versionRange="[1,)"
+ordering="AFTER"
+side="CLIENT"
+
+[[dependencies.chatfaces_smoke]]
+modId="figura"
+type="required"
+versionRange="[0.1.6,0.1.7)"
+ordering="AFTER"
+side="CLIENT"
+
+[[dependencies.chatfaces_smoke]]
+modId="chat_heads"
+type="required"
+versionRange="[0.15.7,0.15.8)"
+ordering="AFTER"
+side="CLIENT"
