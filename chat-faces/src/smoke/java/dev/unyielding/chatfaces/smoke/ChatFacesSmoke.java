@@ -321,6 +321,7 @@ public final class ChatFacesSmoke {
         }
         if (sawRed && sawBlue) {
             pass(currentCase().name, "Saw distinct red and blue live frames within the head bounds");
+            if (currentCase().listener) Minecraft.getInstance().gui.getChat().clearMessages(false);
             caseIndex++;
             if (caseIndex < CASES.size()) {
                 prepareAnimatedCase();
@@ -550,6 +551,7 @@ public final class ChatFacesSmoke {
             save(image, "smoke-death-" + deathCase + ".png");
             pass("death-portrait-" + deathCase, "Victim and creature appear in the vanilla death message");
         }
+        if (deathCase == 1) mc.gui.getChat().clearMessages(false);
         deathCase++;
         if (deathCase < deathTypes.size()) prepareDeath(); else succeed();
     }

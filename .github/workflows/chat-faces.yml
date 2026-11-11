@@ -30,6 +30,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Build and verify
         run: ./gradlew --no-daemon build compileSmokeJava
+      - name: Verify standalone JAR
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('build/libs/Chat-Faces-1.1.0.jar') as archive:
+              assert not any(name.startswith('dzwdz/chat_heads/') for name in archive.namelist())
+              metadata = archive.read('META-INF/neoforge.mods.toml').decode()
+              assert 'modId="chat_heads"' not in metadata
+              assert 'modId="figura"' in metadata
+          print('No Chat Heads classes or dependency are present.')
+          PY
       - name: Prepare virtual display
         run: |
           if ! command -v xvfb-run >/dev/null 2>&1; then
