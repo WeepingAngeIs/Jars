@@ -4,8 +4,9 @@
   "package": "dev.unyielding.chatfaces.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "ChatHeadsMixin",
-    "ChatComponentMixin"
+    "ChatComponentMixin",
+    "ChatListenerMixin",
+    "EntityRenderDispatcherAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

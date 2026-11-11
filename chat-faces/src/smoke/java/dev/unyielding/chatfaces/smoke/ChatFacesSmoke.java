@@ -2,9 +2,7 @@ package dev.unyielding.chatfaces.smoke;
 
 import com.google.gson.GsonBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
-import dzwdz.chat_heads.ChatHeads;
-import dzwdz.chat_heads.config.ChatHeadsConfigDefaults;
-import dzwdz.chat_heads.config.RenderPosition;
+import dev.unyielding.chatfaces.client.ChatMessageLayout;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
@@ -16,6 +14,8 @@ import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
@@ -50,20 +50,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Development-only OpenGL smoke test. This source set must never enter the
  * released mod JAR. It creates only a uniquely named world in run-smoke.
  *
- * <p>The test supplies sender metadata at the same Chat Heads API boundary used
- * by its chat listener, then renders the actual mixed-in ChatComponent. It does
+ * <p>The test supplies sender metadata to the independent chat layout, then
+ * renders the actual mixed-in ChatComponent. It does
  * not simulate a multiplayer packet or claim to test server-side delivery.</p>
  */
 @Mod(value = "chatfaces_smoke", dist = Dist.CLIENT)
 public final class ChatFacesSmoke {
-    private enum Stage { TITLE, WORLD, SKIN, AVATAR, ANIMATION, FADE, DISABLED, DONE }
+    private enum Stage { TITLE, WORLD, SKIN, AVATAR, ANIMATION, FADE, DISABLED, DEATH, DONE }
 
     private static final long TIMEOUT_MILLIS = 230_000L;
     private static final List<Case> CASES = List.of(
-            new Case("before-line-full", RenderPosition.BEFORE_LINE, 1.0),
-            new Case("before-name-full", RenderPosition.BEFORE_NAME, 1.0),
-            new Case("before-line-half", RenderPosition.BEFORE_LINE, 0.5),
-            new Case("before-name-half", RenderPosition.BEFORE_NAME, 0.5));
+            new Case("before-line-full", false, 1.0),
+            new Case("before-name-full", true, 1.0),
+            new Case("before-line-half", false, 0.5),
+            new Case("before-name-half", true, 0.5));
 
     private final AtomicBoolean finished = new AtomicBoolean();
     private final List<Map<String, Object>> checks = new ArrayList<>();
@@ -82,6 +82,8 @@ public final class ChatFacesSmoke {
     private boolean sawBlue;
     private int beforeLineX = -1;
     private int beforeNameX = -1;
+    private int deathCase;
+    private final List<EntityType<?>> deathTypes = List.of(EntityType.ZOMBIE, EntityType.SKELETON, EntityType.SPIDER);
 
     public ChatFacesSmoke() {
         if (!Boolean.getBoolean("chatfaces.smoke")) {
@@ -205,21 +207,14 @@ public final class ChatFacesSmoke {
 
     private void prepareChat(Case spec) {
         Minecraft mc = Minecraft.getInstance();
-        ChatHeads.CONFIG = new ChatHeadsConfigDefaults() {
-            @Override
-            public RenderPosition renderPosition() {
-                return spec.position;
-            }
-        };
         mc.options.chatScale().set(spec.scale);
         chat = new ChatComponent(mc);
         createdAt = mc.gui.getGuiTicks();
-        Component message = Component.literal("[Rank] " + owner.getProfile().getName()
+        Component message = Component.literal((spec.ranked ? "[Rank] " : "") + owner.getProfile().getName()
                 + ": original animated fixture");
-        // Exercise the existing message-owner and line-layout mixins. This is
-        // the client rendering boundary, not a forged network packet.
-        ChatHeads.handleAddedMessage(message, null, owner);
-        chat.addMessage(message, null, null);
+        var previous = ChatMessageLayout.setSender(owner.getProfile());
+        try { chat.addMessage(message, null, null); }
+        finally { ChatMessageLayout.setSender(previous); }
     }
 
     private void prepareAnimatedCase() {
@@ -244,7 +239,7 @@ public final class ChatFacesSmoke {
             return;
         }
         if (stage != Stage.SKIN && stage != Stage.ANIMATION
-                && stage != Stage.FADE && stage != Stage.DISABLED) {
+                && stage != Stage.FADE && stage != Stage.DISABLED && stage != Stage.DEATH) {
             return;
         }
         lastSampleTick = ticks;
@@ -254,7 +249,7 @@ public final class ChatFacesSmoke {
                 case SKIN -> {
                     try (NativeImage image = drawAndCapture(graphics, createdAt, true)) {
                         require(iconEnergy(image, graphics) > 150,
-                                "No ordinary Chat Heads skin pixels in the reserved face square");
+                                "No ordinary skin pixels in the reserved face square");
                         save(image, "smoke-skin-fallback.png");
                         pass("native-skin-fallback", "Nonempty reserved head square without an avatar");
                     }
@@ -274,8 +269,11 @@ public final class ChatFacesSmoke {
                     } finally {
                         Configs.AVATAR_PORTRAIT.value = true;
                     }
-                    succeed();
+                    deathCase = 0;
+                    prepareDeath();
+                    advance(Stage.DEATH);
                 }
+                case DEATH -> verifyDeath(graphics);
                 default -> { }
             }
         } catch (Throwable failure) {
@@ -359,8 +357,8 @@ public final class ChatFacesSmoke {
         GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
         boolean scissor = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
 
-        // This invokes the real ChatComponent, real Chat Heads positioning, the
-        // product mixins, Figura's renderer, and the product compositor.
+        // This invokes the real ChatComponent, the product mixins, Figura's
+        // renderer, the creature renderer, and the product compositor.
         chat.render(graphics, time, -1, -1, focused);
         graphics.flush();
 
@@ -496,6 +494,45 @@ public final class ChatFacesSmoke {
         if (!condition) throw new IllegalStateException(message);
     }
 
-    private record Case(String name, RenderPosition position, double scale) { }
+    private void prepareDeath() {
+        Minecraft mc = Minecraft.getInstance();
+        mc.options.chatScale().set(1.0);
+        chat = new ChatComponent(mc);
+        createdAt = mc.gui.getGuiTicks();
+        Entity mob = deathTypes.get(deathCase).create(mc.level);
+        require(mob != null, "Could not create test creature");
+        chat.addMessage(Component.translatable("death.attack.mob",
+                mc.player.getDisplayName(), mob.getDisplayName()));
+    }
+
+    private void verifyDeath(GuiGraphics graphics) throws Exception {
+        Minecraft mc = Minecraft.getInstance();
+        try (NativeImage image = drawAndCapture(graphics, createdAt, true)) {
+            String prefix = mc.player.getDisplayName().getString() + " was slain by ";
+            int x = 4 + 10 + mc.font.width(prefix);
+            require(iconEnergyAt(image, graphics, x) > 60,
+                    "No creature portrait in death message for " + deathTypes.get(deathCase));
+            save(image, "smoke-death-" + deathCase + ".png");
+            pass("death-portrait-" + deathCase, "Victim and creature appear in the vanilla death message");
+        }
+        deathCase++;
+        if (deathCase < deathTypes.size()) prepareDeath(); else succeed();
+    }
+
+    private static long iconEnergyAt(NativeImage image, GuiGraphics graphics, int guiX) {
+        double px = (double) image.getWidth() / graphics.guiWidth();
+        double py = (double) image.getHeight() / graphics.guiHeight();
+        int x0 = (int) Math.floor(guiX * px), x1 = (int) Math.ceil((guiX + 8) * px);
+        int y0 = (int) Math.floor((graphics.guiHeight() - 49) * py);
+        int y1 = (int) Math.ceil((graphics.guiHeight() - 41) * py);
+        long sum = 0;
+        for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) {
+            int p = image.getPixelRGBA(x, y);
+            sum += red(p) + green(p) + blue(p);
+        }
+        return sum;
+    }
+
+    private record Case(String name, boolean ranked, double scale) { }
     private record Marker(int count, int red, int blue, int minX, int minY, int maxX, int maxY) { }
 }

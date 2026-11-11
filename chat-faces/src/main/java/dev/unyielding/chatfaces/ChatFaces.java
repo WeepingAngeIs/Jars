@@ -16,7 +16,7 @@ public final class ChatFaces {
 
     public ChatFaces() {
         NeoForge.EVENT_BUS.addListener(this::onLoggingOut);
-        LOGGER.info("Chat Faces loaded: live Figura portraits with Chat Heads 0.15.7");
+        LOGGER.info("Chat Faces loaded: independent live chat portraits");
     }
 
     private void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {

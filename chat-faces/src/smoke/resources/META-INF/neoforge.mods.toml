@@ -22,9 +22,3 @@ versionRange="[0.1.6,0.1.7)"
 ordering="AFTER"
 side="CLIENT"
 
-[[dependencies.chatfaces_smoke]]
-modId="chat_heads"
-type="required"
-versionRange="[0.15.7,0.15.8)"
-ordering="AFTER"
-side="CLIENT"

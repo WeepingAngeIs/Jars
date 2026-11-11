@@ -2,10 +2,9 @@ package dev.unyielding.chatfaces.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.unyielding.chatfaces.ChatFaces;
-import dzwdz.chat_heads.ChatHeads;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.gui.components.PlayerFaceRenderer;
 import net.minecraft.client.renderer.ShaderInstance;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -16,17 +15,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Defers live model rendering until Chat Heads has finished emitting chat glyphs.
+ * Defers model rendering until Minecraft has finished emitting chat glyphs.
  *
- * <p>Chat Heads' default placement calls its icon renderer from inside Font's
- * glyph visitor. Figura flushes the shared entity buffer while rendering a
- * portrait. Keeping that work outside the visitor avoids coupling its buffer
- * lifetime to any installed font renderer.</p>
+ * <p>Figura flushes the shared entity buffer while rendering a portrait.
+ * Keeping that work outside the text draw avoids coupling its buffer lifetime
+ * to any installed font renderer.</p>
  *
  * <p>All entry points run on Minecraft's render thread. A context belongs to one
  * ChatComponent render call; none of its player or matrix references survive
- * that call. Direct Chat Heads callers such as its configuration preview and
- * command suggestions deliberately retain their existing skin rendering.</p>
+ * that call.</p>
  */
 public final class ChatFaceRenderQueue {
     private static final int MAX_FACES_PER_PASS = 512;
@@ -83,30 +80,23 @@ public final class ChatFaceRenderQueue {
 
     /**
      * Return true only when this call has been accepted for deferred rendering.
-     * A false result leaves the unmodified Chat Heads renderer in control.
      */
     public static boolean enqueue(GuiGraphics graphics, int x, int y,
-                                  PlayerInfo owner, float opacity, boolean drawShadow) {
+                                  ChatMessageLayout.Portrait portrait, float opacity) {
         Frame frame = activeFrame;
-        if (frame == null || replayDepth != 0 || !frame.rendererAvailable
-                || frame.graphics != graphics || owner == null
+        if (frame == null || replayDepth != 0
+                || frame.graphics != graphics || portrait == null
                 || !Float.isFinite(opacity) || opacity <= 0.0F
                 || frame.faces.size() >= MAX_FACES_PER_PASS) {
             return false;
         }
 
         try {
-            if (!FiguraPortraitRenderer.isEligible(owner)) {
-                return false;
-            }
-
-            // The font visitor temporarily replaces this pose in BEFORE_NAME
-            // mode. Copy it now, before Chat Heads restores the previous pose.
             frame.faces.add(new Face(
                     new Matrix4f(graphics.pose().last().pose()),
                     new Matrix3f(graphics.pose().last().normal()),
                     ScissorState.capture(),
-                    x, y, owner, opacity, drawShadow));
+                    x, y, portrait, opacity));
             return true;
         } catch (RuntimeException | LinkageError failure) {
             reportFailure(failure);
@@ -147,25 +137,29 @@ public final class ChatFaceRenderQueue {
 
                 boolean rendered = false;
                 try {
-                    rendered = FiguraPortraitRenderer.draw(
-                            replayGraphics, face.x, face.y, face.owner,
-                            face.opacity, face.drawShadow);
+                    if (frame.rendererAvailable && face.portrait.player() != null) {
+                        rendered = FiguraPortraitRenderer.draw(replayGraphics, face.x, face.y,
+                                face.portrait.player(), face.opacity, false);
+                    } else if (frame.rendererAvailable && face.portrait.type() != null) {
+                        rendered = FiguraPortraitRenderer.drawCreature(replayGraphics, face.x, face.y,
+                                face.portrait.type(), face.portrait.id(), face.opacity);
+                    }
                 } catch (RuntimeException | LinkageError failure) {
                     reportFailure(failure);
                 }
 
-                if (!rendered) {
-                    // An avatar can become unavailable after capture, or its
-                    // native portrait renderer can decline the draw. Keep the
-                    // original skin fallback and the exact saved layout.
+                if (!rendered && face.portrait.player() != null) {
                     GuiGraphics fallbackGraphics = new GuiGraphics(
                             minecraft, minecraft.renderBuffers().bufferSource());
                     fallbackGraphics.pose().last().pose().set(face.pose);
                     fallbackGraphics.pose().last().normal().set(face.normal);
                     face.scissor.apply();
-                    ChatHeads.renderChatHead(
-                            fallbackGraphics, face.x, face.y, face.owner,
-                            face.opacity, face.drawShadow);
+                    RenderSystem.enableBlend();
+                    RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, face.opacity);
+                    PlayerFaceRenderer.draw(fallbackGraphics, face.portrait.player().getSkin(),
+                            face.x, face.y, 8);
+                    fallbackGraphics.flush();
+                    RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
                 }
                 replayGraphics.flush();
             }
@@ -200,6 +194,7 @@ public final class ChatFaceRenderQueue {
 
     /** Release session-specific renderer state when the client leaves a world. */
     public static void clear() {
+        ChatMessageLayout.clear();
         for (Frame frame = activeFrame; frame != null; frame = frame.parent) {
             frame.faces.clear();
             frame.rendererAvailable = false;
@@ -217,7 +212,7 @@ public final class ChatFaceRenderQueue {
         if (!reportedFailure) {
             reportedFailure = true;
             ChatFaces.LOGGER.warn(
-                    "Chat Faces could not render a live portrait; using the Chat Heads skin fallback",
+                    "Chat Faces could not render a portrait; using an available fallback",
                     failure);
         }
     }
@@ -235,7 +230,7 @@ public final class ChatFaceRenderQueue {
     }
 
     private record Face(Matrix4f pose, Matrix3f normal, ScissorState scissor,
-                        int x, int y, PlayerInfo owner, float opacity, boolean drawShadow) {
+                        int x, int y, ChatMessageLayout.Portrait portrait, float opacity) {
     }
 
     /** Raw framebuffer coordinates preserve any clip installed by another mod. */

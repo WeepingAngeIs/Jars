@@ -21,35 +21,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Checks external binary contracts without initializing Minecraft or an OpenGL context. */
 class DependencyContractTest {
-    private static final String CHAT_HEADS = "dzwdz/chat_heads/ChatHeads";
     private static final String AVATAR = "org/figuramc/figura/avatar/Avatar";
-    private static final String HEAD_ARGUMENTS = "Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/client/multiplayer/PlayerInfo;F";
-
-    @Test
-    void chatHeadsArtifactMatchesTheInspectedJar() throws Exception {
-        assertEquals("02e10437ceeed34e14e0efe206204658e4b8aa8ee7df10f2a9e28ac20f1b0391", artifactSha256(CHAT_HEADS));
-    }
 
     @Test
     void figuraArtifactMatchesTheInspectedJar() throws Exception {
         assertEquals("f379147b52953e8013c27ee5b9d1552618b649f80a0cbe974ed0c6e8de89515c", artifactSha256(AVATAR));
-    }
-
-    @Test
-    void bothHeadOverloadsConvergeOnTheHookedPublicStaticMethod() throws IOException {
-        ClassNode node = readClass(CHAT_HEADS);
-        String hooked = "(" + HEAD_ARGUMENTS + "Z)V";
-        MethodNode six = method(node, "renderChatHead", hooked);
-        assertEquals(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, six.access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC));
-        MethodNode five = method(node, "renderChatHead", "(" + HEAD_ARGUMENTS + ")V");
-        boolean delegates = false;
-        for (var instruction : five.instructions) {
-            if (instruction instanceof MethodInsnNode call && call.owner.equals(CHAT_HEADS)
-                    && call.name.equals("renderChatHead") && call.desc.equals(hooked)) {
-                delegates = true;
-            }
-        }
-        assertTrue(delegates, "Chat Heads changed its common rendering entry point");
     }
 
     @Test

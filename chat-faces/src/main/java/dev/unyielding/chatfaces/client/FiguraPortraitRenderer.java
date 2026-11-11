@@ -11,6 +11,7 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import dev.unyielding.chatfaces.ChatFaces;
+import dev.unyielding.chatfaces.mixin.EntityRenderDispatcherAccessor;
 import net.minecraft.client.GraphicsStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
@@ -20,6 +21,10 @@ import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -32,6 +37,7 @@ import org.figuramc.figura.model.rendering.PartFilterScheme;
 import org.figuramc.figura.utils.ui.UIHelper;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
@@ -49,6 +55,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Draws Figura's existing Tab portrait into a small, transparent, depth-isolated
@@ -67,6 +75,8 @@ public final class FiguraPortraitRenderer {
     private static final Map<UUID, CachedPortrait> CACHE =
             new LinkedHashMap<>(16, 0.75f, true);
     private static final Map<Avatar, Boolean> FAILED_AVATARS = new WeakHashMap<>();
+    private static final Map<UUID, CreaturePortrait> CREATURES = new LinkedHashMap<>(16, 0.75f, true);
+    private static final Set<EntityType<?>> FAILED_CREATURES = new HashSet<>();
     private static long frame;
 
     private FiguraPortraitRenderer() {
@@ -91,7 +101,7 @@ public final class FiguraPortraitRenderer {
     }
 
     /**
-     * Returns false when the caller must draw Chat Heads' ordinary skin face.
+     * Returns false when the caller must draw the ordinary skin face.
      * Repeated messages from one player reuse that player's current-frame image.
      */
     public static boolean draw(GuiGraphics gui, int x, int y, PlayerInfo owner,
@@ -162,6 +172,135 @@ public final class FiguraPortraitRenderer {
                     "Could not render Figura chat portrait for {}. Using the skin face until this avatar reloads.",
                     uuid, error);
             return false;
+        }
+    }
+
+    /** Renders the attacker's actual entity when it is nearby, or a local model
+     * of the entity type supplied by Minecraft's death-message hover data. */
+    public static boolean drawCreature(GuiGraphics gui, int x, int y, EntityType<?> type,
+                                       UUID id, float opacity) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || id == null || FAILED_CREATURES.contains(type)) return false;
+        CreaturePortrait cached = CREATURES.get(id);
+        if (cached == null || cached.type != type) {
+            if (cached != null) cached.close();
+            if (CREATURES.size() >= MAX_CACHED_FACES) {
+                Iterator<CreaturePortrait> it = CREATURES.values().iterator();
+                CreaturePortrait oldest = it.next();
+                it.remove();
+                oldest.close();
+            }
+            Entity entity = null;
+            for (Entity candidate : mc.level.entitiesForRendering()) {
+                if (id.equals(candidate.getUUID()) && candidate.getType() == type) {
+                    entity = candidate;
+                    break;
+                }
+            }
+            if (entity == null) entity = type.create(mc.level);
+            if (entity == null) return false;
+            cached = new CreaturePortrait(type, entity);
+            CREATURES.put(id, cached);
+        }
+        cached.lastSeenFrame = frame;
+        try (RenderState saved = new RenderState()) {
+            if (cached.renderedFrame != frame) {
+                cached.renderedFrame = frame;
+                try {
+                    renderCreature(cached, saved);
+                } finally {
+                    saved.restoreTargetAndMatrices();
+                }
+            }
+            RenderSystem.enableBlend();
+            RenderSystem.blendFuncSeparate(GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA,
+                    GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+            GL20.glBlendEquationSeparate(GL14.GL_FUNC_ADD, GL14.GL_FUNC_ADD);
+            RenderSystem.disableDepthTest();
+            RenderSystem.depthMask(false);
+            RenderSystem.disableCull();
+            RenderSystem.setShader(GameRenderer::getPositionTexShader);
+            RenderSystem.setShaderTexture(0, cached.target.getColorTextureId());
+            blit(gui, x, y, Math.clamp(opacity, 0.0f, 1.0f), 1.0f);
+            return true;
+        } catch (RuntimeException | LinkageError error) {
+            FAILED_CREATURES.add(type);
+            CreaturePortrait failed = CREATURES.remove(id);
+            if (failed != null) failed.close();
+            ChatFaces.LOGGER.warn("Could not render chat portrait for entity type {}", type, error);
+            return false;
+        }
+    }
+
+    private static void renderCreature(CreaturePortrait cached, RenderState saved) {
+        Minecraft mc = Minecraft.getInstance();
+        Entity entity = cached.entity;
+        MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
+        if (cached.target == null) {
+            cached.target = new TextureTarget(TEXTURE_SIZE, TEXTURE_SIZE, true, Minecraft.ON_OSX);
+            cached.target.setClearColor(0, 0, 0, 0);
+            cached.target.setFilterMode(GL11.GL_NEAREST);
+        }
+        try (GraphicsModeScope mode = new GraphicsModeScope(mc)) {
+            RenderSystem.disableScissor();
+            GL11.glDisable(GL11.GL_STENCIL_TEST);
+            RenderSystem.colorMask(true, true, true, true);
+            RenderSystem.depthMask(true);
+            cached.target.clear(Minecraft.ON_OSX);
+            cached.target.bindWrite(true);
+            saved.usePortraitMatrices();
+            RenderSystem.setShaderColor(1, 1, 1, 1);
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthFunc(GL11.GL_LEQUAL);
+            RenderSystem.enableBlend();
+            GuiGraphics offscreen = new OffscreenGraphics(mc, buffers);
+            EntityRenderDispatcher dispatcher = mc.getEntityRenderDispatcher();
+            Quaternionf oldCamera = dispatcher.cameraOrientation() == null ? null
+                    : new Quaternionf(dispatcher.cameraOrientation());
+            boolean oldShadow = ((EntityRenderDispatcherAccessor) dispatcher).chatfaces$shouldRenderShadow();
+            float oldYaw = entity.getYRot(), oldPitch = entity.getXRot();
+            float oldYawO = entity.yRotO, oldPitchO = entity.xRotO;
+            LivingEntity living = entity instanceof LivingEntity l ? l : null;
+            float body = living == null ? 0 : living.yBodyRot;
+            float bodyO = living == null ? 0 : living.yBodyRotO;
+            float head = living == null ? 0 : living.yHeadRot;
+            float headO = living == null ? 0 : living.yHeadRotO;
+            try {
+                entity.setYRot(180);
+                entity.yRotO = 180;
+                entity.setXRot(0);
+                entity.xRotO = 0;
+                if (living != null) {
+                    living.yBodyRot = living.yBodyRotO = 180;
+                    living.yHeadRot = living.yHeadRotO = 180;
+                }
+                float scale = Math.min(12.0f, Math.max(3.0f, 7.0f / Math.max(0.5f, entity.getBbWidth())));
+                float focus = living == null ? entity.getBbHeight() * 0.65f : living.getEyeHeight();
+                offscreen.pose().pushPose();
+                offscreen.pose().translate(4.0, 4.0, 50.0);
+                offscreen.pose().scale(scale, scale, -scale);
+                offscreen.pose().translate(0, focus, 0);
+                offscreen.pose().mulPose(new Quaternionf().rotateZ((float) Math.PI));
+                Lighting.setupForEntityInInventory();
+                dispatcher.overrideCameraOrientation(new Quaternionf().rotateY((float) Math.PI));
+                dispatcher.setRenderShadow(false);
+                dispatcher.render(entity, 0, 0, 0, 0, 1.0f, offscreen.pose(), buffers, 15728880);
+                offscreen.flush();
+            } finally {
+                buffers.endBatch();
+                dispatcher.setRenderShadow(oldShadow);
+                if (oldCamera != null) dispatcher.overrideCameraOrientation(oldCamera);
+                entity.setYRot(oldYaw);
+                entity.yRotO = oldYawO;
+                entity.setXRot(oldPitch);
+                entity.xRotO = oldPitchO;
+                if (living != null) {
+                    living.yBodyRot = body;
+                    living.yBodyRotO = bodyO;
+                    living.yHeadRot = head;
+                    living.yHeadRotO = headO;
+                }
+            }
         }
     }
 
@@ -277,6 +416,14 @@ public final class FiguraPortraitRenderer {
                 cached.close();
             }
         }
+        Iterator<CreaturePortrait> creatures = CREATURES.values().iterator();
+        while (creatures.hasNext()) {
+            CreaturePortrait cached = creatures.next();
+            if (frame - cached.lastSeenFrame > UNUSED_FRAME_LIMIT) {
+                creatures.remove();
+                cached.close();
+            }
+        }
     }
 
     public static void clear() {
@@ -285,6 +432,35 @@ public final class FiguraPortraitRenderer {
         }
         CACHE.clear();
         FAILED_AVATARS.clear();
+        for (CreaturePortrait cached : CREATURES.values()) cached.close();
+        CREATURES.clear();
+        FAILED_CREATURES.clear();
+    }
+
+    private static final class CreaturePortrait {
+        final EntityType<?> type;
+        final Entity entity;
+        TextureTarget target;
+        long renderedFrame = Long.MIN_VALUE;
+        long lastSeenFrame;
+        CreaturePortrait(EntityType<?> type, Entity entity) { this.type = type; this.entity = entity; }
+        void close() {
+            if (target != null) {
+                int read = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+                int draw = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
+                int texture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+                int framebuffer = target.frameBufferId;
+                int color = target.getColorTextureId();
+                int depth = target.getDepthTextureId();
+                try { target.destroyBuffers(); }
+                finally {
+                    GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, read == framebuffer ? 0 : read);
+                    GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, draw == framebuffer ? 0 : draw);
+                    GlStateManager._bindTexture(texture == color || texture == depth ? 0 : texture);
+                    target = null;
+                }
+            }
+        }
     }
 
     private static final class CachedPortrait implements AutoCloseable {

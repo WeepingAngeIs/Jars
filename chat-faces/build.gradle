@@ -56,7 +56,6 @@ neoForge {
 
 dependencies {
     // Exact public artifacts matched by SHA-512 to the inspected reference JARs.
-    implementation 'maven.modrinth:chat-heads:ZPylso9i'
     implementation 'maven.modrinth:figura:AvgeQoZm'
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'

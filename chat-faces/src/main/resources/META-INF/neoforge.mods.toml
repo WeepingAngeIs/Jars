@@ -8,9 +8,8 @@ version="${version}"
 displayName="Chat Faces"
 authors="Unyielding"
 description='''
-Live Figura portraits in Minecraft chat, integrated with Chat Heads.
-Uses the same loaded avatar and portrait renderer as Figura's player list.
-Client-side addon for Minecraft 1.21.1 and NeoForge.
+Live Figura player portraits and creature portraits in Minecraft chat.
+Client-side mod for Minecraft 1.21.1 and NeoForge.
 '''
 
 [[mixins]]
@@ -28,13 +27,6 @@ modId="minecraft"
 type="required"
 versionRange="[1.21.1]"
 ordering="NONE"
-side="CLIENT"
-
-[[dependencies.chatfaces]]
-modId="chat_heads"
-type="required"
-versionRange="[0.15.7]"
-ordering="AFTER"
 side="CLIENT"
 
 [[dependencies.chatfaces]]
