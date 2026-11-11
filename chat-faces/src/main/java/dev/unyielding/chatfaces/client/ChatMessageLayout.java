@@ -63,6 +63,9 @@ public final class ChatMessageLayout {
             BiFunction<FormattedText, Integer, List<FormattedCharSequence>> original) {
         Selection selection = MESSAGES.computeIfAbsent(message,
                 ignored -> identify(message.content(), SENDER.get()));
+        if (Boolean.getBoolean("chatfaces.smoke") && message.content().getString().contains("was slain by")) {
+            System.out.println("CHAT_FACES_WRAP_DEBUG content=" + message.content() + " selection=" + selection);
+        }
         if (selection.inserts().isEmpty()) return original.apply(message.content(), width);
 
         Component decorated = addMarkers(message.content(), selection);
@@ -85,6 +88,9 @@ public final class ChatMessageLayout {
                 return true;
             });
             if (!placements.isEmpty()) LINES.put(line, List.copyOf(placements));
+            if (Boolean.getBoolean("chatfaces.smoke") && message.content().getString().contains("was slain by")) {
+                System.out.println("CHAT_FACES_WRAP_DEBUG placements=" + placements + " line=" + line);
+            }
         }
         return lines;
     }
