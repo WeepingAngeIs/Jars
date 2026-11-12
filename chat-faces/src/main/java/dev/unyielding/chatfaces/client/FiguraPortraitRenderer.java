@@ -291,6 +291,19 @@ public final class FiguraPortraitRenderer {
                 var renderer = dispatcher.getRenderer(entity);
                 renderer.render(entity, 0, 1.0f, offscreen.pose(), buffers, 15728880);
                 offscreen.flush();
+                offscreen.pose().popPose();
+                if (entity.displayFireAnimation()) {
+                    // Composite Minecraft's animated fire directly into the face texture.
+                    cached.target.bindWrite(true);
+                    RenderSystem.disableDepthTest();
+                    RenderSystem.enableBlend();
+                    RenderSystem.defaultBlendFunc();
+                    RenderSystem.setShaderColor(1, 1, 1, 1);
+                    var atlas = mc.getTextureAtlas(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS);
+                    var flame = atlas.apply(net.minecraft.resources.ResourceLocation.withDefaultNamespace("block/fire_0"));
+                    offscreen.blit(0, 3, 0, FACE_SIZE, 5, flame);
+                    offscreen.flush();
+                }
             } finally {
                 buffers.endBatch();
                 dispatcher.setRenderShadow(oldShadow);
