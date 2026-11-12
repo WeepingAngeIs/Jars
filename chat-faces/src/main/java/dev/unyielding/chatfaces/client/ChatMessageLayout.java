@@ -103,6 +103,7 @@ public final class ChatMessageLayout {
     private record Insertion(int index, Portrait portrait, String name) {}
     private record Selection(List<Insertion> inserts) {}
     private record Segment(Style style, String text) {}
+    private record Glyph(int index, Style style, int codepoint) {}
     private record StyledSender(PlayerInfo player, int position) {}
 
     public static List<FormattedCharSequence> wrap(GuiMessage message, int width, Font font,
@@ -118,7 +119,7 @@ public final class ChatMessageLayout {
         List<FormattedCharSequence> lines = original.apply(decorated, width);
         for (FormattedCharSequence line : lines) {
             List<PlacedPortrait> placements = new ArrayList<>();
-            int[] offset = {0};
+            List<Glyph> preceding = new ArrayList<>();
             line.accept((index, style, codepoint) -> {
                 String insertion = style.getInsertion();
                 if (codepoint == MARKER && SPACER.equals(style.getFont())
@@ -126,11 +127,17 @@ public final class ChatMessageLayout {
                     try {
                         int slot = Integer.parseInt(insertion.substring(TAG.length()));
                         if (slot >= 0 && slot < selection.inserts().size()) {
-                            placements.add(new PlacedPortrait(offset[0], selection.inserts().get(slot).portrait()));
+                            int offset = font.width(sink -> {
+                                for (Glyph glyph : preceding) {
+                                    if (!sink.accept(glyph.index(), glyph.style(), glyph.codepoint())) return false;
+                                }
+                                return true;
+                            });
+                            placements.add(new PlacedPortrait(offset, selection.inserts().get(slot).portrait()));
                         }
                     } catch (NumberFormatException ignored) { }
                 }
-                offset[0] += font.width(FormattedCharSequence.codepoint(codepoint, style));
+                preceding.add(new Glyph(index, style, codepoint));
                 return true;
             });
             if (!placements.isEmpty()) LINES.put(line, List.copyOf(placements));

@@ -19,6 +19,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -275,7 +276,7 @@ public final class ChatFacesSmoke {
             message = Component.literal("<[Rank] ").append(named).append("> original animated fixture");
         }
         if (spec.name.equals("styled-rank-prefix")) {
-            message = Component.literal("<[Ice] Gravy> original animated fixture").withStyle(style -> style.withHoverEvent(
+            message = rankPrefix().copy().append("Gravy> original animated fixture").withStyle(style -> style.withHoverEvent(
                     new HoverEvent(HoverEvent.Action.SHOW_ENTITY, new HoverEvent.EntityTooltipInfo(
                             EntityType.PLAYER, owner.getProfile().getId(), Component.literal("Gravy")))));
         }
@@ -298,13 +299,20 @@ public final class ChatFacesSmoke {
                 @SuppressWarnings("unchecked") List<GuiMessage.Line> lines = (List<GuiMessage.Line>) field.get(chat);
                 var portraits = lines.stream().flatMap(line -> ChatMessageLayout.portraits(line.content()).stream()).toList();
                 require(portraits.size() == 1, "Expected one portrait for the styled nickname");
-                require(portraits.getFirst().x() == mc.font.width("<[Ice] "),
+                require(portraits.getFirst().x() == mc.font.width(rankPrefix()),
                         "The portrait was not placed between the rank and the nickname");
-                pass("styled-rank-position", "Portrait sits after the rank and directly before the nickname");
+                pass("styled-rank-position", "Portrait sits after the custom-font rank icons and before the nickname");
             } catch (ReflectiveOperationException error) {
                 throw new IllegalStateException(error);
             }
         }
+    }
+
+    /** Models Unyielding's private-use rank icon and bracketed gym tag. */
+    private static Component rankPrefix() {
+        Component icons = Component.literal("\uE000\uE005").withStyle(style ->
+                style.withFont(ResourceLocation.fromNamespaceAndPath("chatfaces_smoke", "rank")));
+        return Component.literal("<").append(icons).append(" [Ice] ");
     }
 
     private void prepareAnimatedCase() {
