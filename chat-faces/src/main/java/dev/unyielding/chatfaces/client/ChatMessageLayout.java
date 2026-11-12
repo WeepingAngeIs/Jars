@@ -238,6 +238,7 @@ public final class ChatMessageLayout {
         if (headerEnd >= 0 && position >= headerEnd) position = -1;
         if (position < 0) position = nicknamePosition(text, player);
         if (headerEnd >= 0 && position >= headerEnd) position = -1;
+        if (position < 0) position = positionAfterRank(text, headerEnd);
         if (position < 0 && styled != null) position = styled.position();
         if (position < 0 || position > 160) position = 0;
         return new Selection(List.of(new Insertion(position, Portrait.player(player), player.getProfile().getName())));
@@ -474,6 +475,16 @@ public final class ChatMessageLayout {
         int colon = text.indexOf(':');
         int angle = text.indexOf('>');
         return colon < 0 ? angle : angle < 0 ? colon : Math.min(colon, angle);
+    }
+
+    /** Place a nickname after the last bracketed rank in the chat header. */
+    private static int positionAfterRank(String text, int headerEnd) {
+        if (headerEnd <= 0) return -1;
+        int bracket = text.lastIndexOf(']', headerEnd - 1);
+        if (bracket < 0) return -1;
+        int position = bracket + 1;
+        while (position < headerEnd && Character.isWhitespace(text.charAt(position))) position++;
+        return position < headerEnd ? position : -1;
     }
 
     private static int indexOfIgnoreCase(String text, String needle, int from) {

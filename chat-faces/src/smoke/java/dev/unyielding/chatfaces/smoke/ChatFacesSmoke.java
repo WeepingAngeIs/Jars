@@ -74,7 +74,8 @@ public final class ChatFacesSmoke {
             new Case("before-name-half", true, 0.5, false),
             new Case("received-player-message", false, 1.0, true),
             new Case("updated-nickname", true, 1.0, false),
-            new Case("styled-nickname", true, 1.0, false));
+            new Case("styled-nickname", true, 1.0, false),
+            new Case("styled-rank-prefix", true, 1.0, false));
 
     private final AtomicBoolean finished = new AtomicBoolean();
     private final List<Map<String, Object>> checks = new ArrayList<>();
@@ -273,16 +274,36 @@ public final class ChatFacesSmoke {
                             EntityType.PLAYER, owner.getProfile().getId(), Component.literal("StyledAlias")))));
             message = Component.literal("<[Rank] ").append(named).append("> original animated fixture");
         }
+        if (spec.name.equals("styled-rank-prefix")) {
+            message = Component.literal("<[Ice] Gravy> original animated fixture").withStyle(style -> style.withHoverEvent(
+                    new HoverEvent(HoverEvent.Action.SHOW_ENTITY, new HoverEvent.EntityTooltipInfo(
+                            EntityType.PLAYER, owner.getProfile().getId(), Component.literal("Gravy")))));
+        }
         if (spec.listener) {
             mc.getChatListener().handlePlayerChatMessage(
                     PlayerChatMessage.unsigned(owner.getProfile().getId(), "original animated fixture"),
                     owner.getProfile(), ChatType.bind(ChatType.CHAT, mc.player));
-        } else if (spec.name.equals("updated-nickname") || spec.name.equals("styled-nickname")) {
+        } else if (spec.name.equals("updated-nickname") || spec.name.equals("styled-nickname")
+                || spec.name.equals("styled-rank-prefix")) {
             chat.addMessage(message, null, null);
         } else {
             var previous = ChatMessageLayout.setSender(owner.getProfile());
             try { chat.addMessage(message, null, null); }
             finally { ChatMessageLayout.setSender(previous); }
+        }
+        if (spec.name.equals("styled-rank-prefix")) {
+            try {
+                var field = ChatComponent.class.getDeclaredField("trimmedMessages");
+                field.setAccessible(true);
+                @SuppressWarnings("unchecked") List<GuiMessage.Line> lines = (List<GuiMessage.Line>) field.get(chat);
+                var portraits = lines.stream().flatMap(line -> ChatMessageLayout.portraits(line.content()).stream()).toList();
+                require(portraits.size() == 1, "Expected one portrait for the styled nickname");
+                require(portraits.getFirst().x() == mc.font.width("<[Ice] "),
+                        "The portrait was not placed between the rank and the nickname");
+                pass("styled-rank-position", "Portrait sits after the rank and directly before the nickname");
+            } catch (ReflectiveOperationException error) {
+                throw new IllegalStateException(error);
+            }
         }
     }
 
