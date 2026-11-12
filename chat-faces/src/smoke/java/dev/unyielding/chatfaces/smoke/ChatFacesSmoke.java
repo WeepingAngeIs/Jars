@@ -14,12 +14,15 @@ import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
@@ -89,6 +92,9 @@ public final class ChatFacesSmoke {
     private int beforeNameX = -1;
     private int deathCase;
     private List<ChatMessageLayout.PlacedPortrait> deathPlacements;
+    private Entity burningTestZombie;
+    private BlockPos landingPosition;
+    private BlockState previousLandingBlock;
     private final List<EntityType<?>> deathTypes = List.of(
             EntityType.ZOMBIE, EntityType.SKELETON, EntityType.SPIDER, EntityType.ZOMBIE, EntityType.PLAYER);
     private final List<String> environmentKeys = List.of(
@@ -540,10 +546,24 @@ public final class ChatFacesSmoke {
         Component victim = mc.player.getDisplayName();
         Component message;
         if (deathCase >= deathTypes.size()) {
+            if (environmentKeys.get(deathCase - deathTypes.size()).equals("death.attack.fall")) {
+                landingPosition = mc.player.blockPosition().below();
+                previousLandingBlock = mc.level.getBlockState(landingPosition);
+                mc.level.setBlock(landingPosition, Blocks.SEA_LANTERN.defaultBlockState(), 3);
+            }
             message = Component.translatable(environmentKeys.get(deathCase - deathTypes.size()), victim);
         } else {
             Entity mob = deathTypes.get(deathCase) == EntityType.PLAYER ? mc.player : deathTypes.get(deathCase).create(mc.level);
             require(mob != null, "Could not create test creature");
+            if (deathCase == 0) {
+                mob.setPos(mc.player.getX() + 10, mc.player.getY(), mc.player.getZ() + 10);
+                mob.setSharedFlagOnFire(true);
+                mc.level.addEntity(mob);
+                boolean found = false;
+                for (Entity loaded : mc.level.entitiesForRendering()) if (loaded == mob) found = true;
+                require(found && mob.displayFireAnimation(), "Live burning zombie fixture did not load");
+                burningTestZombie = mob;
+            }
             if (deathCase == 3) mob.setCustomName(Component.literal("Smudge"));
             message = Component.translatable("death.attack.mob", victim, mob.getDisplayName());
         }
@@ -558,6 +578,14 @@ public final class ChatFacesSmoke {
             require(deathPlacements.stream().anyMatch(p -> p.portrait().player() != null), "Victim identity missing");
             if (deathCase >= deathTypes.size()) {
                 require(deathPlacements.stream().anyMatch(p -> p.portrait().environment() == environments.get(deathCase - deathTypes.size())), "Environmental icon missing");
+                if (landingPosition != null) {
+                    var ground = deathPlacements.getLast().portrait().ground();
+                    require(ground != null && ground.sample(owner.getProfile().getId()).is(Blocks.SEA_LANTERN),
+                            "The landing block was not captured from the player");
+                    mc.level.setBlock(landingPosition, Blocks.DIRT.defaultBlockState(), 3);
+                    require(ground.sample(owner.getProfile().getId()).is(Blocks.SEA_LANTERN),
+                            "The landing block changed after the death message");
+                }
             } else if (deathTypes.get(deathCase) == EntityType.PLAYER) {
                 require(deathPlacements.stream().filter(p -> p.portrait().player() != null).count() == 2, "Player attacker identity missing");
             } else {
@@ -570,6 +598,11 @@ public final class ChatFacesSmoke {
 
     private void verifyDeath(GuiGraphics graphics) throws Exception {
         Minecraft mc = Minecraft.getInstance();
+        if (deathCase == 0) {
+            for (int i = 0; i < 3; i++) {
+                try (NativeImage ignored = drawAndCapture(graphics, createdAt, true)) { }
+            }
+        }
         try (NativeImage image = drawAndCapture(graphics, createdAt, true)) {
             int x = 4 + deathPlacements.getLast().x();
             require(iconEnergyAt(image, graphics, x) > 60,
@@ -577,10 +610,28 @@ public final class ChatFacesSmoke {
             int victimX = 4 + deathPlacements.stream().filter(p -> p.portrait().player() != null)
                     .findFirst().orElseThrow().x();
             require(iconEnergyAt(image, graphics, victimX) > 60, "No victim portrait in death message");
+            if (deathCase == 0) {
+                long leaked = 0;
+                for (int py = image.getHeight() - 65; py < image.getHeight(); py++)
+                    for (int px = 0; px < 120; px++) {
+                        int pixel = image.getPixelRGBA(px, py);
+                        leaked += red(pixel) + green(pixel) + blue(pixel);
+                    }
+                require(leaked == 0, "Burning zombie rendering escaped into the lower-left HUD");
+                pass("burning-zombie-contained", "Live burning zombie stayed within its chat portrait");
+            }
             save(image, "smoke-death-" + deathCase + ".png");
             pass("death-portrait-" + deathCase, "Victim and creature appear in the vanilla death message");
         }
         if (deathCase == 1) mc.gui.getChat().clearMessages(false);
+        if (deathCase == 0 && burningTestZombie != null) {
+            mc.level.removeEntity(burningTestZombie.getId(), Entity.RemovalReason.DISCARDED);
+        }
+        if (landingPosition != null) {
+            mc.level.setBlock(landingPosition, previousLandingBlock, 3);
+            pass("landing-block-stable", "Sea lantern remained after the block changed");
+            landingPosition = null;
+        }
         deathCase++;
         if (deathCase < deathTypes.size() + environmentKeys.size()) prepareDeath(); else succeed();
     }

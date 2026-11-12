@@ -6,7 +6,7 @@ portraits in player chat and entity portraits in supported death messages.
 ## Install
 
 Use Java 21, NeoForge 21.1.22 or newer in the 21.1 series, and
-`figura-0.1.6+1.21.1-neoforge-mc.jar`. Add `Chat-Faces-1.1.0.jar` to the
+`figura-0.1.6+1.21.1-neoforge-mc.jar`. Add `Chat-Faces-1.1.1.jar` to the
 client's mods folder. Remove the older Chat Faces JAR. Chat Heads is not a
 dependency; remove it when using Chat Faces to avoid duplicate chat portraits.
 Enable Figura's avatar portrait setting and restart Minecraft.
@@ -27,5 +27,5 @@ avatar with a separate static Tab portrait will also appear static in chat.
 ## Build
 
 Run `./gradlew build` with Java 21. The installable file is
-`build/libs/Chat-Faces-1.1.0.jar`; the sources JAR is not a mod to install.
+`build/libs/Chat-Faces-1.1.1.jar`; the sources JAR is not a mod to install.
 GitHub Actions runs the build and client rendering checks.

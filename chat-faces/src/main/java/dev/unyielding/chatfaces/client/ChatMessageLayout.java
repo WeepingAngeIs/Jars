@@ -14,6 +14,8 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -62,16 +64,34 @@ public final class ChatMessageLayout {
     }
 
     public enum Environment { WATER, LAVA, VOID, FIRE, GROUND }
+    /** The landing block belongs to the message, not the player's later position. */
+    public static final class GroundSnapshot {
+        @Nullable private BlockState state;
+        public GroundSnapshot(@Nullable UUID victim) { sample(victim); }
+        public BlockState sample(@Nullable UUID victim) {
+            Minecraft mc = Minecraft.getInstance();
+            if (state == null && victim != null && mc.level != null) {
+                var player = mc.level.getPlayerByUUID(victim);
+                if (player != null) {
+                    BlockState candidate = mc.level.getBlockState(player.blockPosition().below());
+                    if (!candidate.isAir()) state = candidate;
+                }
+            }
+            return state == null ? Blocks.DIRT.defaultBlockState() : state;
+        }
+    }
     public record Portrait(@Nullable PlayerInfo player, @Nullable EntityType<?> type,
-                           @Nullable UUID id, @Nullable Environment environment) {
+                           @Nullable UUID id, @Nullable Environment environment,
+                           @Nullable GroundSnapshot ground) {
         static Portrait player(PlayerInfo player) {
-            return new Portrait(player, null, player.getProfile().getId(), null);
+            return new Portrait(player, null, player.getProfile().getId(), null, null);
         }
         static Portrait creature(EntityType<?> type, UUID id) {
-            return new Portrait(null, type, id, null);
+            return new Portrait(null, type, id, null, null);
         }
         static Portrait environment(Environment environment, UUID victim) {
-            return new Portrait(null, null, victim, environment);
+            return new Portrait(null, null, victim, environment,
+                    environment == Environment.GROUND ? new GroundSnapshot(victim) : null);
         }
     }
 

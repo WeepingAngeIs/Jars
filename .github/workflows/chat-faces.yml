@@ -34,7 +34,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import zipfile
-          with zipfile.ZipFile('build/libs/Chat-Faces-1.1.0.jar') as archive:
+          with zipfile.ZipFile('build/libs/Chat-Faces-1.1.1.jar') as archive:
               assert not any(name.startswith('dzwdz/chat_heads/') for name in archive.namelist())
               metadata = archive.read('META-INF/neoforge.mods.toml').decode()
               assert 'modId="chat_heads"' not in metadata
@@ -64,7 +64,7 @@ jobs:
         run: sha256sum build/libs/*.jar > build/libs/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Chat-Faces-1.1.0-NeoForge-1.21.1
+          name: Chat-Faces-1.1.1-NeoForge-1.21.1
           path: |
             chat-faces/build/libs/*.jar
             chat-faces/build/libs/SHA256SUMS.txt

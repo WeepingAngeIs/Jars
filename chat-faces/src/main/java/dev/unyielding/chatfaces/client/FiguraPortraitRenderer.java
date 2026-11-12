@@ -285,7 +285,11 @@ public final class FiguraPortraitRenderer {
                 Lighting.setupForEntityInInventory();
                 dispatcher.overrideCameraOrientation(new Quaternionf().rotateY((float) Math.PI));
                 dispatcher.setRenderShadow(false);
-                dispatcher.render(entity, 0, 0, 0, 0, 1.0f, offscreen.pose(), buffers, 15728880);
+                // Draw the live entity model directly. The world dispatcher also
+                // draws flames and other world-only overlays, which can escape a
+                // small GUI target with other rendering mods installed.
+                var renderer = dispatcher.getRenderer(entity);
+                renderer.render(entity, 0, 1.0f, offscreen.pose(), buffers, 15728880);
                 offscreen.flush();
             } finally {
                 buffers.endBatch();

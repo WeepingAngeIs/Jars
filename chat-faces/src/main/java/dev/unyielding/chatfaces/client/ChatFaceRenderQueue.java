@@ -212,14 +212,8 @@ public final class ChatFaceRenderQueue {
         }
         net.minecraft.client.renderer.texture.TextureAtlasSprite sprite;
         if (kind == ChatMessageLayout.Environment.GROUND) {
-            BlockState state = Blocks.DIRT.defaultBlockState();
-            if (mc.level != null && portrait.id() != null) {
-                var player = mc.level.getPlayerByUUID(portrait.id());
-                if (player != null) {
-                    BlockState ground = mc.level.getBlockState(player.blockPosition().below());
-                    if (!ground.isAir()) state = ground;
-                }
-            }
+            BlockState state = portrait.ground() == null ? Blocks.DIRT.defaultBlockState()
+                    : portrait.ground().sample(portrait.id());
             sprite = mc.getBlockRenderer().getBlockModel(state).getParticleIcon();
         } else {
             String name = switch (kind) {
