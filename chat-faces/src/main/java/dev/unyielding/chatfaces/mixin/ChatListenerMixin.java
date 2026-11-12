@@ -17,6 +17,7 @@ import java.time.Instant;
 public abstract class ChatListenerMixin {
     @WrapMethod(method = "handleSystemMessage")
     private void chatfaces$captureSystem(Component message, boolean overlay, Operation<Void> original) {
+        if (!overlay) ChatMessageLayout.observeSystemMessage(message);
         Object previous = ChatMessageLayout.captureDeath(message);
         try {
             original.call(message, overlay);

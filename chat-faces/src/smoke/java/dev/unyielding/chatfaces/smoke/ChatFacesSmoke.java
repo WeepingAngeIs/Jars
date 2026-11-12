@@ -18,6 +18,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.PlayerChatMessage;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -71,7 +72,9 @@ public final class ChatFacesSmoke {
             new Case("before-name-full", true, 1.0, false),
             new Case("before-line-half", false, 0.5, false),
             new Case("before-name-half", true, 0.5, false),
-            new Case("received-player-message", false, 1.0, true));
+            new Case("received-player-message", false, 1.0, true),
+            new Case("updated-nickname", true, 1.0, false),
+            new Case("styled-nickname", true, 1.0, false));
 
     private final AtomicBoolean finished = new AtomicBoolean();
     private final List<Map<String, Object>> checks = new ArrayList<>();
@@ -171,6 +174,25 @@ public final class ChatFacesSmoke {
                             require((int) position.invoke(null, "<[Fairy] uwu> hello", owner) == 9,
                                     "Portrait was not positioned at the nickname");
                             pass("configured-nickname", "The nickname resolved to the player account");
+                            mc.getChatListener().handleSystemMessage(Component.literal("Your nickname is now firstnick."), false);
+                            require(lookup.invoke(null, "<[Fairy] firstnick> hello") != null,
+                                    "The first nickname change was not learned");
+                            mc.getChatListener().handleSystemMessage(
+                                    Component.literal("Your nickname is now uwuwuuwwuw."), false);
+                            PlayerInfo changed = (PlayerInfo) lookup.invoke(null, "<[Fairy] uwuwuuwwuw> hello");
+                            require(changed != null && changed.getProfile().getId().equals(owner.getProfile().getId()),
+                                    "A changed nickname did not resolve automatically");
+                            require((int) position.invoke(null, "<[Fairy] uwuwuuwwuw> hello", owner) == 9,
+                                    "Portrait was not positioned at the new nickname");
+                            require(lookup.invoke(null, "<[Fairy] uwu> hello") == null,
+                                    "The old local nickname remained active");
+                            require(lookup.invoke(null, "<[Fairy] firstnick> hello") == null,
+                                    "The previous learned nickname remained active");
+                            ChatMessageLayout.clear();
+                            changed = (PlayerInfo) lookup.invoke(null, "<[Fairy] uwuwuuwwuw> hello");
+                            require(changed != null && changed.getProfile().getId().equals(owner.getProfile().getId()),
+                                    "The confirmed nickname was not retained on reconnect");
+                            pass("updated-nickname-persisted", "A nickname change was learned and restored");
                             mc.setScreen(null);
                             mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
                             // Native local loading marks this UUID as fetched. No
@@ -242,12 +264,21 @@ public final class ChatFacesSmoke {
         chat = spec.listener ? mc.gui.getChat() : new ChatComponent(mc);
         if (spec.listener) chat.clearMessages(false);
         createdAt = mc.gui.getGuiTicks();
-        Component message = Component.literal((spec.ranked ? "[Rank] " : "") + owner.getProfile().getName()
+        Component message = Component.literal((spec.ranked ? "[Rank] " : "")
+                + (spec.name.equals("updated-nickname") ? "uwuwuuwwuw" : owner.getProfile().getName())
                 + ": original animated fixture");
+        if (spec.name.equals("styled-nickname")) {
+            Component named = Component.literal("StyledAlias").withStyle(style -> style.withHoverEvent(
+                    new HoverEvent(HoverEvent.Action.SHOW_ENTITY, new HoverEvent.EntityTooltipInfo(
+                            EntityType.PLAYER, owner.getProfile().getId(), Component.literal("StyledAlias")))));
+            message = Component.literal("<[Rank] ").append(named).append("> original animated fixture");
+        }
         if (spec.listener) {
             mc.getChatListener().handlePlayerChatMessage(
                     PlayerChatMessage.unsigned(owner.getProfile().getId(), "original animated fixture"),
                     owner.getProfile(), ChatType.bind(ChatType.CHAT, mc.player));
+        } else if (spec.name.equals("updated-nickname") || spec.name.equals("styled-nickname")) {
+            chat.addMessage(message, null, null);
         } else {
             var previous = ChatMessageLayout.setSender(owner.getProfile());
             try { chat.addMessage(message, null, null); }
