@@ -24,6 +24,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.Properties;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.IOException;
 import java.util.function.BiFunction;
 
 /** Associates portraits with vanilla chat messages and preserves their text styles. */
@@ -140,6 +144,7 @@ public final class ChatMessageLayout {
         PlayerInfo player = signedSender == null ? guessSystemSender(text) : findPlayer(signedSender);
         if (player == null) return new Selection(List.of());
         int position = indexOfIgnoreCase(text, player.getProfile().getName(), 0);
+        if (position < 0) position = nicknamePosition(text, player);
         if (position < 0 || position > 160) position = 0;
         return new Selection(List.of(new Insertion(position, Portrait.player(player), player.getProfile().getName())));
     }
@@ -248,6 +253,18 @@ public final class ChatMessageLayout {
         int angle = text.indexOf('>');
         int limit = colon >= 0 ? colon : angle;
         if (limit < 0 || limit > 160) return null;
+        Properties aliases = aliases();
+        for (String nickname : aliases.stringPropertyNames()) {
+            int at = indexOfIgnoreCase(text, nickname, 0);
+            if (at < 0 || at + nickname.length() > limit) continue;
+            if (at > 0 && isNameChar(text.charAt(at - 1))) continue;
+            if (at + nickname.length() < text.length() && isNameChar(text.charAt(at + nickname.length()))) continue;
+            String account = aliases.getProperty(nickname).trim();
+            for (PlayerInfo info : mc.getConnection().getOnlinePlayers()) {
+                if (account.equalsIgnoreCase(info.getProfile().getName())
+                        || account.equalsIgnoreCase(info.getProfile().getId().toString())) return info;
+            }
+        }
         PlayerInfo selected = null;
         int best = Integer.MAX_VALUE;
         for (PlayerInfo info : mc.getConnection().getOnlinePlayers()) {
@@ -259,6 +276,29 @@ public final class ChatMessageLayout {
             if (left && right) { selected = info; best = at; }
         }
         return selected;
+    }
+
+    private static int nicknamePosition(String text, PlayerInfo player) {
+        Properties aliases = aliases();
+        for (String nickname : aliases.stringPropertyNames()) {
+            String account = aliases.getProperty(nickname).trim();
+            if (account.equalsIgnoreCase(player.getProfile().getName())
+                    || account.equalsIgnoreCase(player.getProfile().getId().toString())) {
+                int at = indexOfIgnoreCase(text, nickname, 0);
+                if (at >= 0) return at;
+            }
+        }
+        return -1;
+    }
+
+    private static Properties aliases() {
+        Properties properties = new Properties();
+        Path path = Minecraft.getInstance().gameDirectory.toPath().resolve("config").resolve("chatfaces-nicknames.properties");
+        if (Files.isRegularFile(path)) {
+            try (var input = Files.newBufferedReader(path)) { properties.load(input); }
+            catch (IOException error) { dev.unyielding.chatfaces.ChatFaces.LOGGER.warn("Could not read Chat Faces nicknames", error); }
+        }
+        return properties;
     }
 
     private static boolean isNameChar(char c) {

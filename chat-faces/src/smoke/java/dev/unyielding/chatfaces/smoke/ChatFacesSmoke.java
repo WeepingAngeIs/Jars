@@ -147,6 +147,19 @@ public final class ChatFacesSmoke {
                             && mc.getOverlay() == null) {
                         owner = mc.getConnection().getPlayerInfo(mc.player.getUUID());
                         if (owner != null) {
+                            Path aliases = output.resolve("config/chatfaces-nicknames.properties");
+                            Files.createDirectories(aliases.getParent());
+                            Files.writeString(aliases, "uwu=ChatFacesTest\n");
+                            var lookup = ChatMessageLayout.class.getDeclaredMethod("guessSystemSender", String.class);
+                            lookup.setAccessible(true);
+                            PlayerInfo nickOwner = (PlayerInfo) lookup.invoke(null, "<[Fairy] uwu> hello");
+                            require(nickOwner != null && nickOwner.getProfile().getId().equals(owner.getProfile().getId()),
+                                    "Configured nickname did not resolve to the player");
+                            var position = ChatMessageLayout.class.getDeclaredMethod("nicknamePosition", String.class, PlayerInfo.class);
+                            position.setAccessible(true);
+                            require((int) position.invoke(null, "<[Fairy] uwu> hello", owner) == 9,
+                                    "Portrait was not positioned at the nickname");
+                            pass("configured-nickname", "The nickname resolved to the player account");
                             mc.setScreen(null);
                             mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
                             // Native local loading marks this UUID as fetched. No
