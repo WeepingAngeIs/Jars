@@ -91,6 +91,11 @@ public final class ChatFacesSmoke {
     private List<ChatMessageLayout.PlacedPortrait> deathPlacements;
     private final List<EntityType<?>> deathTypes = List.of(
             EntityType.ZOMBIE, EntityType.SKELETON, EntityType.SPIDER, EntityType.ZOMBIE, EntityType.PLAYER);
+    private final List<String> environmentKeys = List.of(
+            "death.attack.drown", "death.attack.lava", "death.attack.outOfWorld", "death.attack.fall");
+    private final List<ChatMessageLayout.Environment> environments = List.of(
+            ChatMessageLayout.Environment.WATER, ChatMessageLayout.Environment.LAVA,
+            ChatMessageLayout.Environment.VOID, ChatMessageLayout.Environment.GROUND);
 
     public ChatFacesSmoke() {
         if (!Boolean.getBoolean("chatfaces.smoke")) {
@@ -532,12 +537,16 @@ public final class ChatFacesSmoke {
         chat = deathCase == 1 ? mc.gui.getChat() : new ChatComponent(mc);
         if (deathCase == 1) chat.clearMessages(false);
         createdAt = mc.gui.getGuiTicks();
-        Entity mob = deathTypes.get(deathCase) == EntityType.PLAYER ? mc.player : deathTypes.get(deathCase).create(mc.level);
-        require(mob != null, "Could not create test creature");
-        if (deathCase == 3) mob.setCustomName(Component.literal("Smudge"));
         Component victim = mc.player.getDisplayName();
-        Component attacker = mob.getDisplayName();
-        Component message = Component.translatable("death.attack.mob", victim, attacker);
+        Component message;
+        if (deathCase >= deathTypes.size()) {
+            message = Component.translatable(environmentKeys.get(deathCase - deathTypes.size()), victim);
+        } else {
+            Entity mob = deathTypes.get(deathCase) == EntityType.PLAYER ? mc.player : deathTypes.get(deathCase).create(mc.level);
+            require(mob != null, "Could not create test creature");
+            if (deathCase == 3) mob.setCustomName(Component.literal("Smudge"));
+            message = Component.translatable("death.attack.mob", victim, mob.getDisplayName());
+        }
         if (deathCase == 1) mc.getChatListener().handleSystemMessage(message, false);
         else chat.addMessage(message);
         try {
@@ -547,7 +556,9 @@ public final class ChatFacesSmoke {
             deathPlacements = lines.stream().flatMap(line -> ChatMessageLayout.portraits(line.content()).stream()).toList();
             require(deathPlacements.size() == 2, "Expected both victim and attacker markers in a death message");
             require(deathPlacements.stream().anyMatch(p -> p.portrait().player() != null), "Victim identity missing");
-            if (deathTypes.get(deathCase) == EntityType.PLAYER) {
+            if (deathCase >= deathTypes.size()) {
+                require(deathPlacements.stream().anyMatch(p -> p.portrait().environment() == environments.get(deathCase - deathTypes.size())), "Environmental icon missing");
+            } else if (deathTypes.get(deathCase) == EntityType.PLAYER) {
                 require(deathPlacements.stream().filter(p -> p.portrait().player() != null).count() == 2, "Player attacker identity missing");
             } else {
                 require(deathPlacements.stream().anyMatch(p -> p.portrait().type() == deathTypes.get(deathCase)), "Attacker identity missing");
@@ -562,7 +573,7 @@ public final class ChatFacesSmoke {
         try (NativeImage image = drawAndCapture(graphics, createdAt, true)) {
             int x = 4 + deathPlacements.getLast().x();
             require(iconEnergyAt(image, graphics, x) > 60,
-                    "No creature portrait in death message for " + deathTypes.get(deathCase));
+                    "No cause image in death message case " + deathCase);
             int victimX = 4 + deathPlacements.stream().filter(p -> p.portrait().player() != null)
                     .findFirst().orElseThrow().x();
             require(iconEnergyAt(image, graphics, victimX) > 60, "No victim portrait in death message");
@@ -571,7 +582,7 @@ public final class ChatFacesSmoke {
         }
         if (deathCase == 1) mc.gui.getChat().clearMessages(false);
         deathCase++;
-        if (deathCase < deathTypes.size()) prepareDeath(); else succeed();
+        if (deathCase < deathTypes.size() + environmentKeys.size()) prepareDeath(); else succeed();
     }
 
     private static long iconEnergyAt(NativeImage image, GuiGraphics graphics, int guiX) {

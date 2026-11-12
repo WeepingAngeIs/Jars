@@ -5,6 +5,10 @@ import dev.unyielding.chatfaces.ChatFaces;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.client.renderer.ShaderInstance;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -160,6 +164,8 @@ public final class ChatFaceRenderQueue {
                             face.x, face.y, 8);
                     fallbackGraphics.flush();
                     RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+                } else if (!rendered && face.portrait.environment() != null) {
+                    drawEnvironment(replayGraphics, face.x, face.y, face.portrait, face.opacity);
                 }
                 replayGraphics.flush();
             }
@@ -190,6 +196,45 @@ public final class ChatFaceRenderQueue {
             RenderSystem.setShaderTexture(0, previousTexture);
             RenderSystem.setShader(() -> previousShader);
         }
+    }
+
+    private static void drawEnvironment(GuiGraphics graphics, int x, int y,
+                                        ChatMessageLayout.Portrait portrait, float opacity) {
+        Minecraft mc = Minecraft.getInstance();
+        ChatMessageLayout.Environment kind = portrait.environment();
+        if (kind == ChatMessageLayout.Environment.VOID) {
+            int a = Math.clamp((int)(opacity * 255), 0, 255) << 24;
+            graphics.fill(x, y, x + 8, y + 8, a | 0x160b26);
+            graphics.fill(x + 2, y + 1, x + 3, y + 2, a | 0x9b68cc);
+            graphics.fill(x + 5, y + 5, x + 6, y + 6, a | 0x7050a0);
+            graphics.flush();
+            return;
+        }
+        net.minecraft.client.renderer.texture.TextureAtlasSprite sprite;
+        if (kind == ChatMessageLayout.Environment.GROUND) {
+            BlockState state = Blocks.DIRT.defaultBlockState();
+            if (mc.level != null && portrait.id() != null) {
+                var player = mc.level.getPlayerByUUID(portrait.id());
+                if (player != null) {
+                    BlockState ground = mc.level.getBlockState(player.blockPosition().below());
+                    if (!ground.isAir()) state = ground;
+                }
+            }
+            sprite = mc.getBlockRenderer().getBlockModel(state).getParticleIcon();
+        } else {
+            String name = switch (kind) {
+                case WATER -> "block/water_still";
+                case LAVA -> "block/lava_still";
+                default -> "block/fire_0";
+            };
+            sprite = mc.getTextureAtlas(TextureAtlas.LOCATION_BLOCKS).apply(ResourceLocation.fromNamespaceAndPath("minecraft", name));
+        }
+        RenderSystem.enableBlend();
+        if (kind == ChatMessageLayout.Environment.WATER) RenderSystem.setShaderColor(0.3F, 0.5F, 1.0F, opacity);
+        else RenderSystem.setShaderColor(1, 1, 1, opacity);
+        graphics.blit(x, y, 0, 8, 8, sprite);
+        graphics.flush();
+        RenderSystem.setShaderColor(1, 1, 1, 1);
     }
 
     /** Release session-specific renderer state when the client leaves a world. */

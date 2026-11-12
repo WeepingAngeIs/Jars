@@ -61,13 +61,17 @@ public final class ChatMessageLayout {
         if (previous == null) ORIGINAL_DEATH.remove(); else ORIGINAL_DEATH.set((Selection) previous);
     }
 
+    public enum Environment { WATER, LAVA, VOID, FIRE, GROUND }
     public record Portrait(@Nullable PlayerInfo player, @Nullable EntityType<?> type,
-                           @Nullable UUID id) {
+                           @Nullable UUID id, @Nullable Environment environment) {
         static Portrait player(PlayerInfo player) {
-            return new Portrait(player, null, player.getProfile().getId());
+            return new Portrait(player, null, player.getProfile().getId(), null);
         }
         static Portrait creature(EntityType<?> type, UUID id) {
-            return new Portrait(null, type, id);
+            return new Portrait(null, type, id, null);
+        }
+        static Portrait environment(Environment environment, UUID victim) {
+            return new Portrait(null, null, victim, environment);
         }
     }
 
@@ -137,6 +141,11 @@ public final class ChatMessageLayout {
                 found.add(new Insertion(position, portrait, name.getString()));
                 searchFrom = Math.min(text.length(), position + name.getString().length());
             }
+            Environment environment = environmentFor(death.getKey());
+            if (environment != null) {
+                UUID victim = found.isEmpty() ? null : found.getFirst().portrait().id();
+                found.add(new Insertion(text.length(), Portrait.environment(environment, victim), ""));
+            }
             found.sort(Comparator.comparingInt(Insertion::index));
             return new Selection(List.copyOf(found));
         }
@@ -156,6 +165,10 @@ public final class ChatMessageLayout {
         int from = 0;
         for (Insertion insert : original.inserts()) {
             String name = insert.name();
+            if (insert.portrait().environment() != null) {
+                placed.add(new Insertion(text.length(), insert.portrait(), ""));
+                continue;
+            }
             int position = indexOfIgnoreCase(text, name, from);
             if (position < 0) position = findStyledEntity(displayed, insert.portrait().id(), from);
             if (position < 0 && insert.portrait().player() != null) {
@@ -167,6 +180,17 @@ public final class ChatMessageLayout {
             from = position + name.length();
         }
         return placed.isEmpty() ? null : new Selection(List.copyOf(placed));
+    }
+
+    @Nullable
+    private static Environment environmentFor(String key) {
+        if (key.startsWith("death.attack.drown")) return Environment.WATER;
+        if (key.startsWith("death.attack.lava")) return Environment.LAVA;
+        if (key.startsWith("death.attack.outOfWorld")) return Environment.VOID;
+        if (key.startsWith("death.attack.inFire") || key.startsWith("death.attack.onFire")
+                || key.startsWith("death.attack.hotFloor")) return Environment.FIRE;
+        if (key.startsWith("death.attack.fall") || key.startsWith("death.fell.")) return Environment.GROUND;
+        return null;
     }
 
     private static int findStyledEntity(Component displayed, @Nullable UUID id, int from) {
